@@ -13,6 +13,8 @@ pub const BACKGROUND_IMAGE: &str = concatcp!(ASSET_PATH, "mecha_background_color
 
 // settings
 pub const WIFI_ICON: &str = concatcp!(ASSET_PATH, "wifi_icon.png");
+pub const SECURED_WIFI_ICON: &str = concatcp!(ASSET_PATH, "secured_wifi_icon.png");
+pub const WIFI_STRENTH_ICON: &str = concatcp!(ASSET_PATH, "wifi_strength_icon.png");
 pub const BLUETOOTH_ICON: &str = concatcp!(ASSET_PATH, "bluetooth_icon.png");
 pub const DISPLAY_ICON: &str = concatcp!(ASSET_PATH, "display_icon.png");
 pub const APPEARANCE_ICON: &str = concatcp!(ASSET_PATH, "appearance_icon.png");
@@ -27,3 +29,6 @@ pub const RIGHT_ARROW_ICON: &str = concatcp!(ASSET_PATH, "right_arrow.png");
 pub const INFO_ICON: &str = concatcp!(ASSET_PATH, "info_icon.png");
 pub const CONNECTED_ICON: &str = concatcp!(ASSET_PATH, "connected_icon.png");
 pub const BACK_ICON: &str = concatcp!(ASSET_PATH, "back_icon.png");
+pub const ADD_ICON: &str = concatcp!(ASSET_PATH, "back_icon.png");
+pub const DELETE_ICON: &str = concatcp!(ASSET_PATH, "back_icon.png");
+pub const TICK_ICON: &str = concatcp!(ASSET_PATH, "back_icon.png");

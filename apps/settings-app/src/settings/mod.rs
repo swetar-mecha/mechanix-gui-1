@@ -1,7 +1,8 @@
 use crate::constants::{
-    ABOUT_ICON, APPEARANCE_ICON, BACKGROUND_IMAGE, BACK_ICON, BASE_SETTINGS_PATH, BATTERY_ICON,
-    BLUETOOTH_ICON, CONNECTED_ICON, DATE_TIME_ICON, DISPLAY_ICON, HOME_DIR_CONFIG_PATH, INFO_ICON,
-    LANGUAGE_ICON, LOCK_ICON, RIGHT_ARROW_ICON, SOUND_ICON, UPDATE_ICON, USR_SHARE_PATH, WIFI_ICON,
+    ABOUT_ICON, ADD_ICON, APPEARANCE_ICON, BACKGROUND_IMAGE, BACK_ICON, BASE_SETTINGS_PATH,
+    BATTERY_ICON, BLUETOOTH_ICON, CONNECTED_ICON, DATE_TIME_ICON, DELETE_ICON, DISPLAY_ICON,
+    HOME_DIR_CONFIG_PATH, INFO_ICON, LANGUAGE_ICON, LOCK_ICON, RIGHT_ARROW_ICON, SECURED_WIFI_ICON,
+    SOUND_ICON, TICK_ICON, UPDATE_ICON, USR_SHARE_PATH, WIFI_ICON, WIFI_STRENTH_ICON,
 };
 use crate::errors::{SettingsAppError, SettingsAppErrorCodes};
 use anyhow::bail;
@@ -206,12 +207,16 @@ impl Default for LayoutSettings {
 #[serde(deny_unknown_fields)]
 #[serde(default)]
 pub struct Wireless {
-    pub icon: String,
+    pub wifi_icon: String,
+    pub secured_wifi_icon: String,
+    pub wifi_strength_icon: String,
 }
 impl Default for Wireless {
     fn default() -> Self {
         Wireless {
-            icon: WIFI_ICON.to_owned(),
+            wifi_icon: WIFI_ICON.to_owned(),
+            secured_wifi_icon: SECURED_WIFI_ICON.to_owned(),
+            wifi_strength_icon: WIFI_STRENTH_ICON.to_owned(),
         }
     }
 }
@@ -379,11 +384,17 @@ impl Default for SeeOptions {
 #[serde(default)]
 pub struct Footer {
     pub back_icon: String,
+    pub tick_icon: String,
+    pub delete_icon: String,
+    pub add_icon: String,
 }
 impl Default for Footer {
     fn default() -> Self {
         Footer {
             back_icon: BACK_ICON.to_owned(),
+            tick_icon: TICK_ICON.to_owned(),
+            delete_icon: ADD_ICON.to_owned(),
+            add_icon: DELETE_ICON.to_owned(),
         }
     }
 }
