@@ -148,7 +148,7 @@ impl Component for SettingsApp {
             Routes::ScreenOffTime => base = base.push(node!(ScreenOffTime {})),
             Routes::SoundScreen => base = base.push(node!(SoundScreen {})),
             Routes::PerformanceModes => base = base.push(node!(PerformanceMode {})),
-            Routes::BluetoothScreen => base = base.push(node!(BluetoothScreen {})),
+            Routes::BluetoothScreen => base = base.push(node!(BluetoothScreen::new())),
             Routes::BluetoothDeviceInfo => base = base.push(node!(BluetoothDeviceInfo {})),
             Routes::LockScreen => todo!(),
             Routes::LanguageSelect => base = base.push(node!(LanguageSelect {})),

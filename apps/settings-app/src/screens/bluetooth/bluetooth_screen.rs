@@ -1,12 +1,53 @@
+use core::panic;
+use std::future::poll_fn;
+use std::pin::Pin;
+use std::task::Poll;
+
+use futures_util::Future;
+use mechanix_system_dbus_client::bluetooth::BluetoothService;
+use tokio::runtime::Runtime;
+
 use crate::footer_node;
 use crate::gui::Message;
 use crate::gui::Routes;
 use crate::shared::h_divider::HDivider;
 use crate::{components::*, tab_item_node};
 
+enum BluetoothMessage {
+    ToggleBluetooth,
+}
+
+#[derive(Debug, Default)]
+pub struct BluetoothScreenState {
+    pub status: bool,
+}
+
 #[derive(Debug)]
+#[component(State = "BluetoothScreenState")]
 pub struct BluetoothScreen {}
+
+impl BluetoothScreen {
+    pub fn new() -> Self {
+        Self {
+            dirty: false,
+            state: Some(BluetoothScreenState { status: false }),
+        }
+    }
+}
+
+#[state_component_impl(BluetoothScreenState)]
 impl Component for BluetoothScreen {
+    fn init(&mut self) {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("Error while starting the runtime");
+        let status = rt
+            .block_on(BluetoothService::status())
+            .expect("Error checking connection");
+        self.state_mut().status = status > 0;
+    }
+
     fn view(&self) -> Option<Node> {
         let mut base: Node = node!(
             widgets::Div::new().bg(Color::BLACK),
@@ -59,7 +100,8 @@ impl Component for BluetoothScreen {
             ]
         );
         let toggle = node!(
-            Toggle::new(true),
+            Toggle::new(self.state_ref().status)
+                .on_change(Box::new(|_| msg!(BluetoothMessage::ToggleBluetooth))),
             lay![
                 margin:[0., 0., 0., 28.],
                 axis_alignment: Alignment::End
@@ -105,5 +147,28 @@ impl Component for BluetoothScreen {
         main_node = main_node.push(footer_node!(Routes::SettingsList));
         base = base.push(main_node);
         Some(base)
+    }
+
+    fn update(&mut self, msg: component::Message) -> Vec<component::Message> {
+        if let Some(msg) = msg.downcast_ref::<BluetoothMessage>() {
+            match msg {
+                BluetoothMessage::ToggleBluetooth => {
+                    if self.state_ref().status {
+                        tokio::spawn(async move {
+                            let _ = BluetoothService::disable_bluetooth().await;
+                        });
+                    } else {
+                        tokio::spawn(async move {
+                            let _ = BluetoothService::enable_bluetooth().await;
+                        });
+                    }
+                }
+            }
+
+            self.state_mut().status = !self.state_ref().status;
+            vec![]
+        } else {
+            vec![msg]
+        }
     }
 }
