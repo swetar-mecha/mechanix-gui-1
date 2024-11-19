@@ -24,7 +24,7 @@ pub struct WirelessInfoResponse {
     pub name: String,
 }
 
-#[derive(DeserializeDict, SerializeDict, Type, Debug)]
+#[derive(DeserializeDict, Clone, SerializeDict, Type, Debug)]
 // `Type` treats `WirelessScanResponse` is an alias for `a{sv}`.
 #[zvariant(signature = "a{sv}")]
 pub struct WirelessScanListResponse {
@@ -345,7 +345,7 @@ pub async fn wireless_event_notification_stream(
                 Ok(Err(e)) => {
                     eprintln!("Error fetching wireless info: {:?}", anyhow::anyhow!(e));
                     continue; // Skip this iteration if there's an error
-                },
+                }
                 Err(_) => {
                     eprintln!("Timeout when fetching wireless info");
                     continue; // Skip this iteration if there's a timeout

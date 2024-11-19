@@ -1,12 +1,7 @@
-use core::panic;
-use std::future::poll_fn;
-use std::pin::Pin;
-use std::task::Poll;
-
-use futures_util::Future;
 use mechanix_system_dbus_client::bluetooth::BluetoothService;
-use tokio::runtime::Runtime;
+use mechanix_system_dbus_client::wireless::{KnownNetworkListResponse, WirelessService};
 
+use crate::async_run;
 use crate::footer_node;
 use crate::gui::Message;
 use crate::gui::Routes;
@@ -20,6 +15,7 @@ enum BluetoothMessage {
 #[derive(Debug, Default)]
 pub struct BluetoothScreenState {
     pub status: bool,
+    pub devices: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -30,7 +26,10 @@ impl BluetoothScreen {
     pub fn new() -> Self {
         Self {
             dirty: false,
-            state: Some(BluetoothScreenState { status: false }),
+            state: Some(BluetoothScreenState {
+                status: false,
+                devices: vec![],
+            }),
         }
     }
 }
@@ -38,14 +37,16 @@ impl BluetoothScreen {
 #[state_component_impl(BluetoothScreenState)]
 impl Component for BluetoothScreen {
     fn init(&mut self) {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("Error while starting the runtime");
-        let status = rt
-            .block_on(BluetoothService::status())
-            .expect("Error checking connection");
+        let status = async_run!(BluetoothService::status()).unwrap();
+        let scan_list: KnownNetworkListResponse =
+            async_run!(WirelessService::known_networks()).unwrap();
+        let devices: Vec<String> = scan_list
+            .known_network
+            .into_iter()
+            .map(|device| device.ssid)
+            .collect();
         self.state_mut().status = status > 0;
+        self.state_mut().devices = devices;
     }
 
     fn view(&self) -> Option<Node> {
@@ -111,7 +112,6 @@ impl Component for BluetoothScreen {
         header = header.push(toggle);
         header_node = header_node.push(header);
 
-        let devices = [("English"), ("English"), ("Chinese")];
         main_node = main_node.push(header_node);
         main_node = main_node.push(text_node("Available Devices"));
         main_node = main_node.push(node!(Div::new(), lay![size: [10]]));
@@ -121,7 +121,7 @@ impl Component for BluetoothScreen {
             route: Routes::BluetoothDeviceInfo
         ));
         main_node = main_node.push(node!(HDivider { size: 1. }));
-        for (i, device) in devices.into_iter().enumerate() {
+        for (i, device) in self.state_ref().devices.iter().enumerate() {
             main_node = main_node.push(
                 tab_item_node!([text_bold_node(device)], [icon_node("right_arrow_icon")])
                     .key((i + 1) as u64),
@@ -137,7 +137,7 @@ impl Component for BluetoothScreen {
             [icon_node("connected_icon"), icon_node("right_arrow_icon")]
         ));
         main_node = main_node.push(node!(HDivider { size: 1. }));
-        for (i, (device)) in devices.into_iter().enumerate() {
+        for (i, device) in self.state_ref().devices.iter().enumerate() {
             main_node = main_node.push(
                 tab_item_node!([text_bold_node(device)], [icon_node("right_arrow_icon")])
                     .key((i + 1) as u64),
@@ -154,13 +154,9 @@ impl Component for BluetoothScreen {
             match msg {
                 BluetoothMessage::ToggleBluetooth => {
                     if self.state_ref().status {
-                        tokio::spawn(async move {
-                            let _ = BluetoothService::disable_bluetooth().await;
-                        });
+                        let _ = async_run!(BluetoothService::disable_bluetooth());
                     } else {
-                        tokio::spawn(async move {
-                            let _ = BluetoothService::enable_bluetooth().await;
-                        });
+                        let _ = async_run!(BluetoothService::enable_bluetooth());
                     }
                 }
             }

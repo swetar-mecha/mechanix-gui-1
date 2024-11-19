@@ -1,3 +1,4 @@
+mod async_handler;
 mod components;
 mod constants;
 mod errors;
