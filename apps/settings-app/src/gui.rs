@@ -175,7 +175,7 @@ impl Component for SettingsApp {
             Routes::ScreenOffTime => base = base.push(node!(ScreenOffTime {})),
             Routes::SoundScreen => base = base.push(node!(SoundScreen {})),
             Routes::PerformanceModes => base = base.push(node!(PerformanceMode {})),
-            Routes::BluetoothScreen => base = base.push(node!(BluetoothScreen {})),
+            Routes::BluetoothScreen => base = base.push(node!(BluetoothScreen::new())),
             Routes::BluetoothPairingEnterCode => {
                 base = base.push(node!(BluetoothPairingEnterCode {}))
             }
