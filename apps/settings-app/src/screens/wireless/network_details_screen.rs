@@ -1,4 +1,5 @@
 use super::handler::WirelessDetailsItem;
+use crate::footer_node;
 use crate::gui::{Message, Routes};
 use crate::shared::h_divider::HDivider;
 use mctk_core::*;
@@ -174,73 +175,20 @@ impl component::Component for NetworkDetailsScreen {
         c_node = c_node.push(row!("Security", network_security));
         c_node = c_node.push(row!("Encryption", network_encyption));
         c_node = c_node.push(row!("MAC Address", mac_address));
-        // // c_node = c_node.push(row!("Frequency", network_frequency));
-        // c_node = c_node.push(row!("", ""));
-        // c_node = c_node.push(row!("IP Address", "192.168.100.100"));
+        c_node = c_node.push(row!("Frequency", network_frequency));
+        c_node = c_node.push(row!("", ""));
+        c_node = c_node.push(row!("IP Address", "192.168.100.100"));
         // c_node = c_node.push(row!("Subnet Mask", "255.255.255.0"));
         // c_node = c_node.push(row!("Gateway", "192.168.100.1"));
         // // c_node = c_node.push(row!("Network ID", "2"));
         // // c_node = c_node.push(row!("Passphrase", "WPA2"));
 
-        let mut footer_div = node!(
-            Div::new(),
-            lay![
-                size_pct: [100, 20],
-                direction: Direction::Column,
-                cross_alignment: Alignment::Stretch,
-                position_type: Absolute,
-                position: [Auto, 0.0, 0.0, 0.0],
-            ]
-        );
-        let footer_row: Node = node!(
-            Div::new(),
-            lay![
-                direction: Direction::Row,
-                axis_alignment: Alignment::Start,
-                cross_alignment: Alignment::Center,
-            ]
-        )
-        .push(
-            node!(
-                Div::new(),
-                lay![
-                    size_pct: [50],
-                ],
-            )
-            .push(node!(
-                IconButton::new("back_icon")
-                    .on_click(Box::new(|| msg!(Message::ChangeRoute {
-                        route: Routes::SettingsList
-                    })))
-                    .icon_type(IconType::Png)
-                    .style(
-                        "size",
-                        Size {
-                            width: Dimension::Px(52.0),
-                            height: Dimension::Px(52.0),
-                        }
-                    )
-                    .style("background_color", Color::TRANSPARENT)
-                    .style("border_color", Color::TRANSPARENT)
-                    .style("active_color", Color::rgba(85., 85., 85., 0.50))
-                    .style("radius", 12.),
-                lay![
-                    size: [52, 52],
-                cross_alignment: Alignment::Center,
-                margin: [0., 20., 0., 0.]
-                ]
-            )),
-        );
-
-        footer_div = footer_div
-            .push(node!(HDivider { size: 1. }))
-            .push(footer_row);
+        base = base.push(footer_node!(Routes::NetworkScreen));
 
         main_node = main_node.push(c_node);
 
         base = base.push(header_node);
         base = base.push(main_node);
-        base = base.push(footer_div);
 
         Some(base)
     }

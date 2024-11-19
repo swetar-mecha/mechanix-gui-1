@@ -1,4 +1,5 @@
 use super::{component::NetworkRowComponent, handler::WirelessDetailsItem};
+use crate::footer_node;
 use crate::{
     components::text_node,
     gui::{Message, Routes},
@@ -52,7 +53,6 @@ impl Component for NetworkScreen {
         );
 
         let mut c_node = node!(
-            // let mut main_node = node!(
             Div::new(),
             lay![
                 size_pct: [100, 80],
@@ -193,64 +193,10 @@ impl Component for NetworkScreen {
             .push(available_networks_row)
             .push(node!(HDivider { size: 1. }));
 
-        let mut footer_div = node!(
-            Div::new(),
-            lay![
-                size_pct: [100, 20],
-                direction: Direction::Column,
-                cross_alignment: Alignment::Stretch,
-                position_type: Absolute,
-                position: [Auto, 0.0, 0.0, 0.0],
-            ]
-        );
-
-        let footer_row: Node = node!(
-            Div::new(),
-            lay![
-                direction: Direction::Row,
-                axis_alignment: Alignment::Start,
-                cross_alignment: Alignment::Center,
-            ]
-        )
-        .push(
-            node!(
-                Div::new(),
-                lay![
-                    size_pct: [50],
-                ],
-            )
-            .push(node!(
-                IconButton::new("back_icon")
-                    .on_click(Box::new(|| msg!(Message::ChangeRoute {
-                        route: Routes::SettingsList
-                    })))
-                    .icon_type(IconType::Png)
-                    .style(
-                        "size",
-                        Size {
-                            width: Dimension::Px(52.0),
-                            height: Dimension::Px(52.0),
-                        }
-                    )
-                    .style("background_color", Color::TRANSPARENT)
-                    .style("border_color", Color::TRANSPARENT)
-                    .style("active_color", Color::rgba(85., 85., 85., 0.50))
-                    .style("radius", 12.),
-                lay![
-                    size: [52, 52],
-                cross_alignment: Alignment::Center,
-                margin: [0., 20., 0., 0.]
-                ]
-            )),
-        );
-
-        footer_div = footer_div
-            .push(node!(HDivider { size: 1. }))
-            .push(footer_row);
-
         // // c_node = c_node.push(network_div);
         // // c_node = c_node.push(manage_networks_div);
         // // c_node = c_node.push(available_networks_div);
+        base = base.push(footer_node!(Routes::SettingsList));
 
         if connected_network_name.clone().len() < 1 {
             c_node = c_node.push(manage_networks_div);
@@ -275,7 +221,6 @@ impl Component for NetworkScreen {
 
         base = base.push(header_node);
         base = base.push(main_node);
-        base = base.push(footer_div);
 
         Some(base)
     }

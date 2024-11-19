@@ -24,7 +24,7 @@ impl Component for AvailableNetworksScreen {
         let mut main_node = node!(
             widgets::Div::new(),
             lay![
-                size_pct: [100],
+                size_pct: [100,80],
                 cross_alignment: layout::Alignment::Stretch,
                 direction: layout::Direction::Column,
                 padding: [0.0, 10.0, 0.0, 10.0],
@@ -62,18 +62,10 @@ impl Component for AvailableNetworksScreen {
                 axis_alignment: Alignment::Start
             ]
         );
-        let toggle = node!(
-            Toggle::new(true),
-            lay![
-                margin:[0., 0., 0., 28.],
-                axis_alignment: Alignment::End
-            ]
-        );
+
         header = header.push(header_text);
-        header = header.push(toggle);
         header_node = header_node.push(header);
 
-        // let devices = [("English"), ("English"), ("Chinese")];
         let devices = self.available_networks_list.clone();
         main_node = main_node.push(header_node);
         main_node = main_node.push(node!(Div::new(), lay![size: [10]]));
@@ -83,6 +75,38 @@ impl Component for AvailableNetworksScreen {
         //     route: Routes::BluetoothDeviceInfo
         // ));
         main_node = main_node.push(node!(HDivider { size: 1. }));
+
+        // for (i, device) in devices.into_iter().enumerate() {
+        //     main_node = main_node.push(
+        //         tab_item_node!(
+        //             [text_bold_node(&device.scan_info.name)],
+        //             [
+        //                 icon_node("secured_wifi_icon"),
+        //                 icon_node("wifi_strength_icon"),
+        //                 icon_node("info_icon")
+        //             ],
+        //             route: Routes::NetworkDetails
+        //         )
+        //         .key((i + 1) as u64),
+        //     );
+        //     main_node = main_node.push(node!(HDivider { size: 1. }).key(2 * i as u64));
+        // }
+
+        let mut c_node: Node = node!(
+            Div::new(),
+            // .bg(Color::BLACK)
+            // .scroll_y()
+            // .style("bar_width", 0.)
+            // .style("bar_color", Color::TRANSPARENT)
+            // .style("bar_background_color", Color::TRANSPARENT),
+            lay![
+                size_pct: [100, 80],
+                // padding: [5.0, 10.0, 5.0, 10.0],
+                direction: Direction::Column,
+                cross_alignment: Alignment::Stretch,
+            ]
+        );
+
         for (i, device) in devices.into_iter().enumerate() {
             main_node = main_node.push(
                 tab_item_node!(
@@ -99,23 +123,11 @@ impl Component for AvailableNetworksScreen {
             main_node = main_node.push(node!(HDivider { size: 1. }).key(2 * i as u64));
         }
 
-        // main_node = main_node.push(node!(Div::new(), lay![size: [50]]));
-        // main_node = main_node.push(text_node("Other Devices"));
-        // main_node = main_node.push(node!(Div::new(), lay![size: [10]]));
-        // main_node = main_node.push(tab_item_node!(
-        //     [text_bold_node("mecha compute")],
-        //     [icon_node("connected_icon"), icon_node("right_arrow_icon")]
-        // ));
-        main_node = main_node.push(node!(HDivider { size: 1. }));
-        // for (i, device) in devices.into_iter().enumerate() {
-        //     main_node = main_node.push(
-        //         tab_item_node!([text_bold_node(device)], [icon_node("right_arrow_icon")])
-        //             .key((i + 1) as u64),
-        //     );
-        //     main_node = main_node.push(node!(HDivider { size: 1. }).key(2 * i as u64));
-        // }
-        main_node = main_node.push(footer_node!(Routes::SettingsList));
-        base = base.push(main_node);
+        base = base.push(footer_node!(Routes::NetworkScreen));
+        // main_node = main_node.push(node!(HDivider { size: 1. }));
+        c_node = c_node.push(main_node);
+
+        base = base.push(c_node);
         Some(base)
     }
 }
