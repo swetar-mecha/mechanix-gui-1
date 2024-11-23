@@ -1,11 +1,30 @@
+use mechanix_system_dbus_client::bluetooth::BluetoothService;
+use mechanix_system_dbus_client::wireless::WirelessService;
+
+use crate::async_handler::AsyncHandler;
+use crate::async_handler::AsyncHandlerResponse;
+use crate::async_response;
 use crate::footer_node;
 use crate::gui::Message;
 use crate::gui::Routes;
 use crate::shared::h_divider::HDivider;
 use crate::{components::*, tab_item_node};
 
+enum BluetoothScreenMessage {
+    Toggle,
+}
+
+#[derive(Debug, Default)]
+pub struct BluetoothState {
+    status: bool,
+    devices: Vec<String>,
+}
+
 #[derive(Debug)]
+#[component(State = "BluetoothState")]
 pub struct BluetoothScreen {}
+
+#[state_component_impl(BluetoothState)]
 impl Component for BluetoothScreen {
     fn view(&self) -> Option<Node> {
         let mut base: Node = node!(
@@ -105,5 +124,23 @@ impl Component for BluetoothScreen {
         main_node = main_node.push(footer_node!(Routes::SettingsList));
         base = base.push(main_node);
         Some(base)
+    }
+
+    fn update(&mut self, msg: component::Message) -> Vec<component::Message> {
+        AsyncHandler::call(async { BluetoothService::status().await.unwrap() }, "wifi");
+        async_response!(msg: "wifi", payload as i8, {
+            println!("{}", payload);
+            std::process::exit(0);
+        });
+        vec![]
+    }
+}
+
+impl BluetoothScreen {
+    pub fn new() -> Self {
+        Self {
+            dirty: false,
+            state: Some(BluetoothState::default()),
+        }
     }
 }

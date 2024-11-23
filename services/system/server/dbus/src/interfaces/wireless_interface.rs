@@ -304,7 +304,7 @@ pub async fn wireless_event_notification_stream(
     wireless_bus: &WirelessBusInterface,
     conn: &zbus::Connection,
 ) -> Result<(), ZbusError> {
-    let mut interval = time::interval(Duration::from_secs(5));
+    let mut interval = time::interval(Duration::from_secs(15));
     let mut previous_is_enabled: Option<bool> = None;
     let mut previous_is_connected: Option<bool> = None;
     let mut previous_signal_strength: Option<String> = None;
@@ -335,7 +335,7 @@ pub async fn wireless_event_notification_stream(
         // Initialize variables
         let (is_connected, signal_strength, ssid, frequency) = if is_enabled {
             // If WiFi is enabled, check if it's connected and get signal strength, SSID, and frequency
-            match timeout(Duration::from_secs(5), wireless.info()).await {
+            match timeout(Duration::from_secs(15), wireless.info()).await {
                 Ok(Ok(info)) => (
                     true,
                     info.signal.clone().to_string(),
@@ -345,7 +345,7 @@ pub async fn wireless_event_notification_stream(
                 Ok(Err(e)) => {
                     eprintln!("Error fetching wireless info: {:?}", anyhow::anyhow!(e));
                     continue; // Skip this iteration if there's an error
-                },
+                }
                 Err(_) => {
                     eprintln!("Timeout when fetching wireless info");
                     continue; // Skip this iteration if there's a timeout

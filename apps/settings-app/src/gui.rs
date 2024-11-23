@@ -166,7 +166,13 @@ impl Component for SettingsApp {
             Routes::ScreenOffTime => base = base.push(node!(ScreenOffTime {})),
             Routes::SoundScreen => base = base.push(node!(SoundScreen {})),
             Routes::PerformanceModes => base = base.push(node!(PerformanceMode {})),
-            Routes::BluetoothScreen => base = base.push(node!(BluetoothScreen {})),
+            Routes::BluetoothScreen => base = base.push(node!(BluetoothScreen::new())),
+            Routes::BluetoothPairingEnterCode => {
+                base = base.push(node!(BluetoothPairingEnterCode {}))
+            }
+            Routes::BluetoothPairingVerifyCode => {
+                base = base.push(node!(BluetoothPairingVerifyCode {}))
+            }
             Routes::BluetoothDeviceInfo => base = base.push(node!(BluetoothDeviceInfo {})),
             Routes::LockScreen => todo!(),
             Routes::LanguageSelect => base = base.push(node!(LanguageSelect {})),
@@ -208,10 +214,8 @@ impl Component for SettingsApp {
                 Message::AvailableNetworksList { list } => {
                     self.state_mut().available_networks_list = list.clone();
                 }
-                _ => (),
             }
         }
-
         vec![]
     }
 }

@@ -43,6 +43,7 @@ async fn main() -> Result<()> {
 
     handles.push(_bluetooth_handle);
 
+    println!("{:?}", config.interfaces.network.device.clone());
     let wireless_bus = WirelessBusInterface {
         path: config.interfaces.network.device.clone(),
     };

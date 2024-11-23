@@ -1,3 +1,4 @@
+mod async_handler;
 mod components;
 mod constants;
 mod errors;
@@ -8,6 +9,7 @@ mod shared;
 mod utils;
 
 use crate::gui::SettingsApp;
+use async_handler::{AsyncHandler, AsyncHandlerResponse};
 use futures::StreamExt;
 use gui::Message;
 use mctk_core::{
@@ -228,7 +230,7 @@ async fn main() -> anyhow::Result<()> {
         },
     );
     let app_channel = app_channel_tx.clone();
-
+    AsyncHandler::init(window_tx.clone());
     let handle = event_loop.handle();
     let window_tx_2 = window_tx.clone();
 
