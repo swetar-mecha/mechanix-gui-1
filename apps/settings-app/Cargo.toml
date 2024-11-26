@@ -29,6 +29,7 @@ dirs = "5.0.1"
 tokio = { version = "1.33", features = ["full"] }
 zbus = { version = "4.1.2", features = ["tokio"] }
 mechanix_system_dbus_client = { path = "../../services/system/client/dbus" }
+mechanix_status_bar_components = { path = "../../shell/commons/status-bar" }
 futures-util = "0.3.30"
 futures = "0.3.30"
 regex="1.11.1"

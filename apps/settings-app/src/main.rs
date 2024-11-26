@@ -9,7 +9,7 @@ mod utils;
 
 use crate::gui::SettingsApp;
 use futures::StreamExt;
-use gui::Message;
+use gui::{Message, NetworkMessage};
 use mctk_core::{
     msg,
     reexports::{
@@ -28,7 +28,10 @@ use mctk_smithay::{
     xdg_shell::xdg_window::{XdgWindow, XdgWindowParams},
     WindowInfo, WindowMessage, WindowOptions,
 };
-use mechanix_system_dbus_client::wireless::WirelessInfoResponse;
+use mechanix_status_bar_components::types::WirelessStatus;
+use mechanix_system_dbus_client::wireless::{
+    KnownNetworkListResponse, KnownNetworkResponse, WirelessInfoResponse,
+};
 use screens::wireless::handler::{WirelessDetailsItem, WirelessServiceHandle};
 use settings::{AppSettings, MainSettings};
 use std::{
@@ -55,31 +58,32 @@ pub struct UiParams {
 
 #[derive(Debug)]
 pub enum WirelessMessage {
-    // Status { status: }
-    Toggle { value: Option<bool> },
-    // available networks
-    // manage networks
-}
-
-#[derive(Debug)]
-pub enum AppMessage {
-    NetworkStatus {
-        status: bool,
+    Status {
+        status: Option<bool>,
     },
-    ConnectedNetwork {
-        info: WirelessInfoResponse,
+    Toggle {
+        value: Option<bool>,
     },
-    // UpdateNetworkStatus { status: bool },
-    Wireless {
-        message: WirelessMessage,
-    },
-    NotFound,
-    AvailableNetworksList {
-        list: Vec<WirelessDetailsItem>,
+    ConnectedNetworkName {
+        name: String,
     },
     ConnectedNetworkDetails {
         details: Option<WirelessDetailsItem>,
     },
+    AvailableNetworksList {
+        list: Vec<WirelessDetailsItem>,
+    },
+    KnownNetworksList {
+        // manage networks
+        list: Vec<KnownNetworkResponse>,
+    },
+    getStatus,
+}
+
+#[derive(Debug)]
+pub enum AppMessage {
+    Wireless { message: WirelessMessage },
+    NotFound,
 }
 
 #[derive(Default, Clone)]
@@ -250,37 +254,55 @@ async fn main() -> anyhow::Result<()> {
     let _ = handle.insert_source(app_channel_rx, move |event, _, _| {
         let _ = match event {
             calloop::channel::Event::Msg(msg) => match msg {
-                AppMessage::NetworkStatus { status } => {
-                    let _ = window_tx_2.clone().send(WindowMessage::Send {
-                        message: msg!(Message::WirelessStatus { status: status }),
-                    });
-                }
-                AppMessage::ConnectedNetwork { info } => {
-                    let _ = window_tx_2.clone().send(WindowMessage::Send {
-                        message: msg!(Message::ConnectedNetwork { info: info }),
-                    });
-                }
-                AppMessage::ConnectedNetworkDetails { details } => {
-                    let _ = window_tx_2.clone().send(WindowMessage::Send {
-                        message: msg!(Message::ConnectedNetworkDetails { details: details }),
-                    });
-                }
                 AppMessage::Wireless { message } => match message {
-                    WirelessMessage::Toggle { .. } => {
-                        println!("INSIDE TOGGLE");
+                    WirelessMessage::Status { status } => {
+                        if let Some(value) = status {
+                            let _ = window_tx_2.send(WindowMessage::Send {
+                                message: msg!(NetworkMessage::WirelessStatus { status: value }),
+                            });
+                        } else {
+                            println!("No Wireless Value found");
+                        }
+                    }
+                    WirelessMessage::getStatus => {
                         let wireless_msg_tx_cloned = wireless_msg_tx.clone();
                         futures::executor::block_on(async move {
                             //let (tx, rx) = oneshot::channel();
-                            let res = wireless_msg_tx_cloned.send(message).await;
+                            let res = wireless_msg_tx_cloned.clone().send(message).await;
                             //let res = rx.await.expect("no reply from service");
                         });
                     }
+                    WirelessMessage::Toggle { .. } => {
+                        let wireless_msg_tx_cloned = wireless_msg_tx.clone();
+                        futures::executor::block_on(async move {
+                            //let (tx, rx) = oneshot::channel();
+                            let res = wireless_msg_tx_cloned.clone().send(message).await;
+                            //let res = rx.await.expect("no reply from service");
+                        });
+                    }
+                    WirelessMessage::ConnectedNetworkName { name } => {
+                        let _ = window_tx_2.send(WindowMessage::Send {
+                            message: msg!(NetworkMessage::ConnectedNetworkName { name: name }),
+                        });
+                    }
+                    WirelessMessage::ConnectedNetworkDetails { details } => {
+                        let _ = window_tx_2.send(WindowMessage::Send {
+                            message: msg!(NetworkMessage::ConnectedNetworkDetails {
+                                details: details
+                            }),
+                        });
+                    }
+                    WirelessMessage::AvailableNetworksList { list } => {
+                        let _ = window_tx_2.send(WindowMessage::Send {
+                            message: msg!(NetworkMessage::AvailableNetworksList { list: list }),
+                        });
+                    }
+                    WirelessMessage::KnownNetworksList { list } => {
+                        let _ = window_tx_2.send(WindowMessage::Send {
+                            message: msg!(NetworkMessage::KnownNetworksList { list: list }),
+                        });
+                    }
                 },
-                AppMessage::AvailableNetworksList { list } => {
-                    let _ = window_tx_2.clone().send(WindowMessage::Send {
-                        message: msg!(Message::AvailableNetworksList { list: list }),
-                    });
-                }
                 AppMessage::NotFound => todo!(),
                 _ => (),
             },

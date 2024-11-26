@@ -10,7 +10,7 @@ use mctk_core::{
 };
 
 use crate::{
-    gui::{Message, Routes},
+    gui::{Message, NetworkScreenRoutes, Routes},
     shared::h_divider::HDivider,
 };
 
@@ -62,7 +62,7 @@ impl Component for SettingsScreen {
         );
 
         header = header.push(header_text);
-
+        // let wireless_status = self.state_ref().wireless_status.clone();
         let network_row = node!(
             SettingsRowComponent {
                 title: "Network".to_string(),
@@ -71,7 +71,9 @@ impl Component for SettingsScreen {
                 icon_2: "right_arrow_icon".to_string(),
                 color: Color::WHITE,
                 on_click: Some(Box::new(move || msg!(Message::ChangeRoute {
-                    route: Routes::NetworkScreen
+                    route: Routes::Network {
+                        screen: NetworkScreenRoutes::NetworkScreen
+                    }
                 }))),
             },
             lay![
