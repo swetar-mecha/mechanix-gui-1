@@ -17,6 +17,8 @@ lazy_static! {
         output_device: Context::new(vec![]),
         output_volume: Context::new(0.0),
 
+        max_volume: Context::new(65536.0),
+
         listen_to_stream: Context::new(false)
     };
 }
@@ -28,6 +30,7 @@ pub struct SoundModel {
 
     pub output_device: Context<Vec<String>>,
     pub output_volume: Context<f64>,
+    pub max_volume: Context<f64>,
 
     pub listen_to_stream: Context<bool>,
 }
@@ -43,7 +46,7 @@ impl SoundModel {
             if let Ok(device) = handler.get_default_device() {
                 let mut volume = device.volume;
                 let mut avg = volume.avg();
-                avg.0 = ((value * 0.01) * 65536.0) as u32;
+                avg.0 = ((value * 0.01) * *Self::get().max_volume.get()) as u32;
                 for i in 1..=volume.len() {
                     volume.set(i, avg);
                 }
@@ -80,8 +83,13 @@ impl SoundModel {
                 if let Ok(device) = output_handler.get_default_device() {
                     let volume = device.volume;
                     let avg = volume.avg();
-                    let value = avg.0 as f64 / 65536.0 * 100.0;
-                    SoundModel::get().output_volume.set(value);
+                    let value = avg.0 as f64 / *Self::get().max_volume.get() * 100.0;
+                    if value > 100.0 {
+                        SoundModel::get().output_volume.set(100.0);
+                        SoundModel::set_output_volume(100.0);
+                    } else {
+                        SoundModel::get().output_volume.set(value);
+                    }
                 }
 
                 if let Ok(device) = input_handler.get_default_device() {

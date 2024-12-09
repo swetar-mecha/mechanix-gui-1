@@ -98,8 +98,74 @@ impl component::Component for SoundScreen {
             [icon_node("right_arrow_icon")],
             on_click: Some(Box::new(move || msg!(Message::ChangeSoundScreenRoute { route: SoundScreenRoute::SelectInputDevice }))),
         );
+
+        // toggle row
+        let toggle_row = node!(
+            Div::new(),
+            lay![
+                size: [480, 50],
+                direction: Direction::Row,
+                axis_alignment: Alignment::Stretch,
+                cross_alignment:Alignment::Center,
+                padding: [5., 0., 15., 0.],
+            ]
+        )
+        .push(
+            node!(
+                Div::new(),
+                lay![
+                    size: [350, 50],
+                    axis_alignment: Alignment::Start,
+                    cross_alignment: Alignment::Center,
+                ]
+            )
+            .push(node!(
+                Text::new(txt!("Loudness Enhancer"))
+                    .style("color", Color::WHITE)
+                    .style("size", 20.0)
+                    .style("font", "Space Grotesk")
+                    .style("font_weight", FontWeight::Normal),
+                lay![]
+            )),
+        )
+        .push(
+            node!(
+                Div::new().bg(Color::TRANSPARENT),
+                lay![
+                    size_pct: [20, 40],
+                    axis_alignment: Alignment::End,
+                    cross_alignment: Alignment::Center,
+                ]
+            )
+            .push(node!(
+                Toggle::new(false).on_change(Box::new(|value| {
+                    SoundModel::get()
+                        .max_volume
+                        .set(if value { 400000.0 } else { 65536.0 });
+                    // WirelessModel::update();
+                    Box::new(())
+                })),
+                lay![]
+            )),
+        );
+
+        let toggle_node = node!(
+            Div::new(),
+            lay![
+                size: [350, 50],
+                direction: Direction::Column,
+                cross_alignment: Alignment::Stretch,
+            ]
+        )
+        .push(toggle_row);
+
         main_node = main_node.push(node!(Div::new(), lay![size: [20]]));
-        main_node = main_node.push(text_bold_node("OUTPUT"));
+        main_node = main_node.push(toggle_node);
+        main_node = main_node.push(text_bold_node(
+            &((*SoundModel::get().output_volume.get() * *SoundModel::get().max_volume.get() * 0.01)
+                as u32)
+                .to_string(),
+        ));
         main_node = main_node.push(output_slider);
         main_node = main_node.push(output_device);
         // main_node = main_node.push(node!(HDivider { size: 1. }));
