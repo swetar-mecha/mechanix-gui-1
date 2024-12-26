@@ -184,6 +184,166 @@ macro_rules! header_node {
     }};
 }
 
+#[macro_export]
+macro_rules! footer_node {
+    ($left_expr: expr, $left_on_click:expr) => {{
+        let row_node = node!(
+            Div::new().bg(Color::TRANSPARENT),
+            lay![
+                size_pct: [100, 100],
+                direction: Direction::Row,
+                cross_alignment: Alignment::Center,
+                axis_alignment: Alignment::Stretch,
+                position: [Auto, 0., 0., 0.],
+                position_type: Absolute,
+                margin: [0., 0., 0., 0.]
+            ]
+        )
+        .push(
+            node!(
+                Div::new(),
+                lay![
+                    size_pct: [80, Auto],
+                    axis_alignment: Alignment::Start,
+                    cross_alignment: Alignment::Center,
+                ],
+            )
+            .push(node!(
+                IconButton::new("back_icon")
+                    .on_click(left_on_click)
+                    .icon_type(IconType::Png)
+                    .style(
+                        "size",
+                        Size {
+                            width: Dimension::Px(34.0),
+                            height: Dimension::Px(34.0),
+                        }
+                    )
+                    .style("background_color", Color::TRANSPARENT)
+                    .style("border_color", Color::TRANSPARENT)
+                    .style("active_color", Color::rgba(85., 85., 85., 0.50))
+                    .style("radius", 10.),
+                lay![
+                    size: [42, 42],
+                    padding: [0, 0, 0, 2.],
+                    axis_alignment: Alignment::Start,
+                    cross_alignment: Alignment::Center,
+                ]
+            )),
+        );
+        let footer_node = node!(
+            Div::new().bg(Color::TRANSPARENT),
+            lay![
+                size_pct: [100, 16],
+                direction: Direction::Column,
+                position: [Auto, 0., 0., 0.],
+                position_type: Absolute,
+                axis_alignment: Alignment::Stretch,
+                cross_alignment: Alignment::Stretch
+            ]
+        ).push(node!(HDivider {
+            size: 0.8,
+            color: Color::rgba(166.0, 166.0, 166.0, 1.)
+        }))
+        .push(row_node);
+        footer_node
+    }};
+
+
+    ($left_expr: expr, $left_on_click:expr, $right_expr: expr, $right_expr_type: expr ,$right_on_click:expr) => {{
+        let row_node = node!(
+            Div::new().bg(Color::TRANSPARENT),
+            lay![
+                size_pct: [100, 100],
+                direction: Direction::Row,
+                cross_alignment: Alignment::Center,
+                axis_alignment: Alignment::Stretch,
+                margin: [0., 0., 0., 0.]
+            ]
+        )
+        .push(
+            node!(
+                Div::new(),
+                lay![
+                    size_pct: [80, Auto],
+                    axis_alignment: Alignment::Start,
+                    cross_alignment: Alignment::Center,
+                ],
+            )
+            .push(node!(
+                IconButton::new($left_expr)
+                    .on_click($left_on_click)
+                    .icon_type(IconType::Png)
+                    .style(
+                        "size",
+                        Size {
+                            width: Dimension::Px(34.0),
+                            height: Dimension::Px(34.0),
+                        }
+                    )
+                    .style("background_color", Color::TRANSPARENT)
+                    .style("border_color", Color::TRANSPARENT)
+                    .style("active_color", Color::rgba(85., 85., 85., 0.50))
+                    .style("radius", 10.),
+                lay![
+                    size: [42, 42],
+                    padding: [0, 0, 0, 2.],
+                    axis_alignment: Alignment::Start,
+                    cross_alignment: Alignment::Center,
+                ]
+            )),
+        )
+        .push(
+            node!(
+                Div::new(),
+                lay![
+                    size_pct: [20, Auto],
+                    axis_alignment: Alignment::End,
+                    padding: [0, 0, 0, 5.],
+                ]
+            )
+            .push(node!(
+                IconButton::new($right_expr)
+                    .on_click($right_on_click)
+                    .icon_type($right_expr_type)
+                    .style(
+                        "size",
+                        Size {
+                            width: Dimension::Px(40.0),
+                            height: Dimension::Px(40.0),
+                        }
+                    )
+                    .style("background_color", Color::TRANSPARENT)
+                    .style("border_color", Color::TRANSPARENT)
+                    .style("active_color", Color::rgba(85., 85., 85., 0.50))
+                    .style("radius", 10.),
+                lay![
+                    size: [52, 52],
+                    axis_alignment: Alignment::End,
+                    cross_alignment: Alignment::Center,
+                ]
+            )),
+        );
+        let footer_node = node!(
+            Div::new().bg(Color::TRANSPARENT),
+            lay![
+                size_pct: [100, 16],
+                direction: Direction::Column,
+                position: [Auto, 0., 0., 0.],
+                position_type: Absolute,
+                axis_alignment: Alignment::Stretch,
+                cross_alignment: Alignment::Stretch
+            ]
+        ).push(node!(HDivider {
+            size: 0.8,
+            color: Color::rgba(166.0, 166.0, 166.0, 1.)
+        }))
+        .push(row_node);
+        footer_node
+    }};
+
+}
+
 pub fn sub_header_node(text: &str) -> Node {
     let text_node = node!(
         Div::new(),

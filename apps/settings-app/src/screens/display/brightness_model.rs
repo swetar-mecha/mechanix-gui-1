@@ -23,7 +23,7 @@ impl BrightnessModel {
 
     pub fn set_brightness(value: f64) {
         RUNTIME.spawn(async move {
-            Display::set_brightness_percentage((value * 254.0) as u8)
+            Display::set_brightness_percentage((value as f32 / 100. * 254.).max(5.) as u8)
                 .await
                 .unwrap();
         });

@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+use crate::footer_node;
 use crate::gui::{Message, NetworkScreenRoutes, Routes};
 
 use lazy_static::lazy_static;
@@ -113,32 +114,32 @@ impl Component for AddNetwork {
                     cross_alignment: Alignment::Center,
                 ],
             )
-            .push(node!(
-                IconButton::new("back_icon")
-                    .on_click(Box::new(|| msg!(Message::ChangeRoute {
-                        route: Routes::Network {
-                            screen: NetworkScreenRoutes::Networking
-                        }
-                    })))
-                    .icon_type(IconType::Png)
-                    .style(
-                        "size",
-                        Size {
-                            width: Dimension::Px(34.0),
-                            height: Dimension::Px(34.0),
-                        }
-                    )
-                    .style("background_color", Color::TRANSPARENT)
-                    .style("border_color", Color::TRANSPARENT)
-                    .style("active_color", Color::rgba(85., 85., 85., 0.50))
-                    .style("radius", 10.),
-                lay![
-                    size: [42, 42],
-                    padding: [0, 0, 0, 2.],
-                    axis_alignment: Alignment::Start,
-                    cross_alignment: Alignment::Center,
-                ]
-            ))
+            // .push(node!(
+            //     IconButton::new("back_icon")
+            //         .on_click(Box::new(|| msg!(Message::ChangeRoute {
+            //             route: Routes::Network {
+            //                 screen: NetworkScreenRoutes::Networking
+            //             }
+            //         })))
+            //         .icon_type(IconType::Png)
+            //         .style(
+            //             "size",
+            //             Size {
+            //                 width: Dimension::Px(34.0),
+            //                 height: Dimension::Px(34.0),
+            //             }
+            //         )
+            //         .style("background_color", Color::TRANSPARENT)
+            //         .style("border_color", Color::TRANSPARENT)
+            //         .style("active_color", Color::rgba(85., 85., 85., 0.50))
+            //         .style("radius", 10.),
+            //     lay![
+            //         size: [42, 42],
+            //         padding: [0, 0, 0, 2.],
+            //         axis_alignment: Alignment::Start,
+            //         cross_alignment: Alignment::Center,
+            //     ]
+            // ))
             .push(
                 node!(
                     Div::new(),
@@ -150,49 +151,49 @@ impl Component for AddNetwork {
                 )
                 .push(text_node),
             ),
-        )
-        .push(
-            node!(
-                Div::new(),
-                lay![
-                    size_pct: [20, Auto],
-                    axis_alignment: Alignment::End,
-                    padding: [0, 0, 0, 10.],
-                ]
-            )
-            .push(node!(
-                IconButton::new("tick_icon")
-                    .on_click(Box::new(|| {
-                        WirelessModel::connect_to_network(
-                            FORM.ssid.get().clone(),
-                            FORM.password.get().clone(),
-                        );
-                        msg!(Message::ChangeRoute {
-                            route: Routes::Network {
-                                screen: NetworkScreenRoutes::Networking
-                            }
-                        })
-                    }))
-                    .icon_type(IconType::Svg)
-                    .style(
-                        "size",
-                        Size {
-                            width: Dimension::Px(34.0),
-                            height: Dimension::Px(34.0),
-                        }
-                    )
-                    .style("background_color", Color::TRANSPARENT)
-                    .style("border_color", Color::TRANSPARENT)
-                    .style("active_color", Color::rgba(85., 85., 85., 0.50))
-                    .style("radius", 10.),
-                lay![
-                    size: [52, 52],
-                    axis_alignment: Alignment::End,
-                    cross_alignment: Alignment::Center,
-                    padding: [0., 0., 0., 2.]
-                ]
-            )),
         );
+        // .push(
+        //     node!(
+        //         Div::new(),
+        //         lay![
+        //             size_pct: [20, Auto],
+        //             axis_alignment: Alignment::End,
+        //             padding: [0, 0, 0, 10.],
+        //         ]
+        //     )
+        //     .push(node!(
+        //         IconButton::new("tick_icon")
+        //             .on_click(Box::new(|| {
+        //                 WirelessModel::connect_to_network(
+        //                     FORM.ssid.get().clone(),
+        //                     FORM.password.get().clone(),
+        //                 );
+        //                 msg!(Message::ChangeRoute {
+        //                     route: Routes::Network {
+        //                         screen: NetworkScreenRoutes::Networking
+        //                     }
+        //                 })
+        //             }))
+        //             .icon_type(IconType::Svg)
+        //             .style(
+        //                 "size",
+        //                 Size {
+        //                     width: Dimension::Px(34.0),
+        //                     height: Dimension::Px(34.0),
+        //                 }
+        //             )
+        //             .style("background_color", Color::TRANSPARENT)
+        //             .style("border_color", Color::TRANSPARENT)
+        //             .style("active_color", Color::rgba(85., 85., 85., 0.50))
+        //             .style("radius", 10.),
+        //         lay![
+        //             size: [52, 52],
+        //             axis_alignment: Alignment::End,
+        //             cross_alignment: Alignment::Center,
+        //             padding: [0., 0., 0., 2.]
+        //         ]
+        //     )),
+        // );
 
         let mut content_node = node!(
             Div::new(),
@@ -327,6 +328,27 @@ impl Component for AddNetwork {
 
         base = base.push(header_node);
         base = base.push(content_node);
+
+        base = base.push(footer_node!(
+            "back_icon",
+            Box::new(|| msg!(Message::ChangeRoute {
+                route: Routes::SettingsList
+            })),
+            "tick_icon",
+            IconType::Svg,
+            Box::new(|| {
+                WirelessModel::connect_to_network(
+                    FORM.ssid.get().clone(),
+                    FORM.password.get().clone(),
+                );
+                msg!(Message::ChangeRoute {
+                    route: Routes::Network {
+                        screen: NetworkScreenRoutes::Networking
+                    }
+                })
+            })
+        ));
+
         Some(base)
     }
 }

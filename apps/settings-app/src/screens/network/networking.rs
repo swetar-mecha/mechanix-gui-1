@@ -4,6 +4,7 @@ use crate::{
     gui::{Message, NetworkScreenRoutes, Routes},
     utils::truncate,
 };
+use crate::{components::*, footer_node};
 use std::hash::Hash;
 
 use mctk_core::widgets::Scrollable;
@@ -116,7 +117,7 @@ impl Component for NetworkingScreen {
             Div::new(),
             lay![
                 size_pct: [100],
-                padding: [5.0, 0.0, 5.0, 0.0],
+                padding: [5.0, 0.0, 10.0, 0.0],
                 direction: Direction::Column,
                 cross_alignment: Alignment::Stretch,
             ]
@@ -149,30 +150,30 @@ impl Component for NetworkingScreen {
                     cross_alignment: Alignment::Center,
                 ],
             )
-            .push(node!(
-                IconButton::new("back_icon")
-                    .on_click(Box::new(|| msg!(Message::ChangeRoute {
-                        route: Routes::SettingsList
-                    })))
-                    .icon_type(IconType::Png)
-                    .style(
-                        "size",
-                        Size {
-                            width: Dimension::Px(34.0),
-                            height: Dimension::Px(34.0),
-                        }
-                    )
-                    .style("background_color", Color::TRANSPARENT)
-                    .style("border_color", Color::TRANSPARENT)
-                    .style("active_color", Color::rgba(85., 85., 85., 0.50))
-                    .style("radius", 10.),
-                lay![
-                    size: [42, 42],
-                    padding: [0, 0, 0, 2.],
-                    axis_alignment: Alignment::Start,
-                    cross_alignment: Alignment::Center,
-                ]
-            ))
+            // .push(node!(
+            //     IconButton::new("back_icon")
+            //         .on_click(Box::new(|| msg!(Message::ChangeRoute {
+            //             route: Routes::SettingsList
+            //         })))
+            //         .icon_type(IconType::Png)
+            //         .style(
+            //             "size",
+            //             Size {
+            //                 width: Dimension::Px(34.0),
+            //                 height: Dimension::Px(34.0),
+            //             }
+            //         )
+            //         .style("background_color", Color::TRANSPARENT)
+            //         .style("border_color", Color::TRANSPARENT)
+            //         .style("active_color", Color::rgba(85., 85., 85., 0.50))
+            //         .style("radius", 10.),
+            //     lay![
+            //         size: [42, 42],
+            //         padding: [0, 0, 0, 2.],
+            //         axis_alignment: Alignment::Start,
+            //         cross_alignment: Alignment::Center,
+            //     ]
+            // ))
             .push(
                 node!(
                     Div::new(),
@@ -194,33 +195,33 @@ impl Component for NetworkingScreen {
                     padding: [0, 0, 0, 10.],
                 ]
             )
-            .push(node!(
-                IconButton::new("add_icon")
-                    .on_click(Box::new(|| msg!(Message::ChangeRoute {
-                        route: Routes::Network {
-                            screen: NetworkScreenRoutes::AddNetwork {
-                                ssid: "".to_string()
-                            }
-                        }
-                    })))
-                    .icon_type(IconType::Png)
-                    .style(
-                        "size",
-                        Size {
-                            width: Dimension::Px(40.0),
-                            height: Dimension::Px(40.0),
-                        }
-                    )
-                    .style("background_color", Color::TRANSPARENT)
-                    .style("border_color", Color::TRANSPARENT)
-                    .style("active_color", Color::rgba(85., 85., 85., 0.50))
-                    .style("radius", 10.),
-                lay![
-                    size: [52, 52],
-                    axis_alignment: Alignment::End,
-                    cross_alignment: Alignment::Center,
-                ]
-            ))
+            // .push(node!(
+            //     IconButton::new("add_icon")
+            //         .on_click(Box::new(|| msg!(Message::ChangeRoute {
+            //             route: Routes::Network {
+            //                 screen: NetworkScreenRoutes::AddNetwork {
+            //                     ssid: "".to_string()
+            //                 }
+            //             }
+            //         })))
+            //         .icon_type(IconType::Png)
+            //         .style(
+            //             "size",
+            //             Size {
+            //                 width: Dimension::Px(40.0),
+            //                 height: Dimension::Px(40.0),
+            //             }
+            //         )
+            //         .style("background_color", Color::TRANSPARENT)
+            //         .style("border_color", Color::TRANSPARENT)
+            //         .style("active_color", Color::rgba(85., 85., 85., 0.50))
+            //         .style("radius", 10.),
+            //     lay![
+            //         size: [52, 52],
+            //         axis_alignment: Alignment::End,
+            //         cross_alignment: Alignment::Center,
+            //     ]
+            // ))
             .push(node!(
                 IconButton::new("wireless_settings")
                     .on_click(Box::new(|| msg!(Message::ChangeRoute {
@@ -867,9 +868,9 @@ impl Component for NetworkingScreen {
         );
 
         let mut scrollable_section = node!(
-            Scrollable::new(size!(440, 310)),
+            Scrollable::new(size!(440, 260)),
             lay![
-                size: [440, 310],
+                size: [440, 260],
                 direction: Direction::Column,
                 cross_alignment: Alignment::Stretch,
             ]
@@ -972,8 +973,112 @@ impl Component for NetworkingScreen {
             }));
         }
 
+        let footer_node_x = node!(
+            Div::new().bg(Color::TRANSPARENT),
+            lay![
+                size_pct: [100, 20],
+                direction: Direction::Row,
+                cross_alignment: Alignment::Center,
+                axis_alignment: Alignment::Stretch,
+                position: [Auto, 0., 0., 0.],
+                position_type: Absolute,
+                margin: [0., 0., 10., 0.]
+            ]
+        )
+        .push(
+            node!(
+                Div::new(),
+                lay![
+                    size_pct: [80, Auto],
+                    axis_alignment: Alignment::Start,
+                    cross_alignment: Alignment::Center,
+                ],
+            )
+            .push(node!(
+                IconButton::new("back_icon")
+                    .on_click(Box::new(|| msg!(Message::ChangeRoute {
+                        route: Routes::SettingsList
+                    })))
+                    .icon_type(IconType::Png)
+                    .style(
+                        "size",
+                        Size {
+                            width: Dimension::Px(34.0),
+                            height: Dimension::Px(34.0),
+                        }
+                    )
+                    .style("background_color", Color::TRANSPARENT)
+                    .style("border_color", Color::TRANSPARENT)
+                    .style("active_color", Color::rgba(85., 85., 85., 0.50))
+                    .style("radius", 10.),
+                lay![
+                    size: [42, 42],
+                    padding: [0, 0, 0, 2.],
+                    axis_alignment: Alignment::Start,
+                    cross_alignment: Alignment::Center,
+                ]
+            )),
+        )
+        .push(
+            node!(
+                Div::new(),
+                lay![
+                    size_pct: [20, Auto],
+                    axis_alignment: Alignment::End,
+                    padding: [0, 0, 0, 10.],
+                ]
+            )
+            .push(node!(
+                IconButton::new("add_icon")
+                    .on_click(Box::new(|| msg!(Message::ChangeRoute {
+                        route: Routes::Network {
+                            screen: NetworkScreenRoutes::AddNetwork {
+                                ssid: "".to_string()
+                            }
+                        }
+                    })))
+                    .icon_type(IconType::Png)
+                    .style(
+                        "size",
+                        Size {
+                            width: Dimension::Px(40.0),
+                            height: Dimension::Px(40.0),
+                        }
+                    )
+                    .style("background_color", Color::TRANSPARENT)
+                    .style("border_color", Color::TRANSPARENT)
+                    .style("active_color", Color::rgba(85., 85., 85., 0.50))
+                    .style("radius", 10.),
+                lay![
+                    size: [52, 52],
+                    axis_alignment: Alignment::End,
+                    cross_alignment: Alignment::Center,
+                ]
+            )),
+        );
+
         base = base.push(header_node);
         base = base.push(content_node);
+        // // base = base.push(footer_node);
+        // base = base.push(node!(HDivider {
+        //     size: 0.8,
+        //     color: Color::rgba(83.0, 83.0, 83.0, 1.)
+        // }));
+        base = base.push(footer_node!(
+            "back_icon",
+            Box::new(|| msg!(Message::ChangeRoute {
+                route: Routes::SettingsList
+            })),
+            "add_icon",
+            IconType::Png,
+            Box::new(|| msg!(Message::ChangeRoute {
+                route: Routes::Network {
+                    screen: NetworkScreenRoutes::AddNetwork {
+                        ssid: "".to_string()
+                    }
+                }
+            }))
+        ));
 
         Some(base)
     }

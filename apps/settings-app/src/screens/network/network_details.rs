@@ -2,6 +2,7 @@ use std::hash::Hash;
 
 use super::wireless_model::WirelessModel;
 use crate::components::{detail_row, DetailRow};
+use crate::footer_node;
 use crate::gui::{Message, NetworkScreenRoutes, Routes};
 use crate::utils::truncate;
 
@@ -136,32 +137,32 @@ impl Component for NetworkDetails {
                     cross_alignment: Alignment::Center,
                 ],
             )
-            .push(node!(
-                IconButton::new("back_icon")
-                    .on_click(Box::new(|| msg!(Message::ChangeRoute {
-                        route: Routes::Network {
-                            screen: NetworkScreenRoutes::Networking
-                        }
-                    })))
-                    .icon_type(IconType::Png)
-                    .style(
-                        "size",
-                        Size {
-                            width: Dimension::Px(34.0),
-                            height: Dimension::Px(34.0),
-                        }
-                    )
-                    .style("background_color", Color::TRANSPARENT)
-                    .style("border_color", Color::TRANSPARENT)
-                    .style("active_color", Color::rgba(85., 85., 85., 0.50))
-                    .style("radius", 10.),
-                lay![
-                    size: [42, 42],
-                    padding: [0, 0, 0, 2.],
-                    axis_alignment: Alignment::Start,
-                    cross_alignment: Alignment::Center,
-                ]
-            ))
+            // .push(node!(
+            //     IconButton::new("back_icon")
+            //         .on_click(Box::new(|| msg!(Message::ChangeRoute {
+            //             route: Routes::Network {
+            //                 screen: NetworkScreenRoutes::Networking
+            //             }
+            //         })))
+            //         .icon_type(IconType::Png)
+            //         .style(
+            //             "size",
+            //             Size {
+            //                 width: Dimension::Px(34.0),
+            //                 height: Dimension::Px(34.0),
+            //             }
+            //         )
+            //         .style("background_color", Color::TRANSPARENT)
+            //         .style("border_color", Color::TRANSPARENT)
+            //         .style("active_color", Color::rgba(85., 85., 85., 0.50))
+            //         .style("radius", 10.),
+            //     lay![
+            //         size: [42, 42],
+            //         padding: [0, 0, 0, 2.],
+            //         axis_alignment: Alignment::Start,
+            //         cross_alignment: Alignment::Center,
+            //     ]
+            // ))
             .push(
                 node!(
                     Div::new(),
@@ -182,31 +183,30 @@ impl Component for NetworkDetails {
                     axis_alignment: Alignment::End,
                     margin: [0., 0., 0., 10.]
                 ]
-            )
-            .push(node!(
-                IconButton::new("delete_icon")
-                    .on_click(Box::new(move || msg!(NetworkDetailsMessage::openModel(
-                        !is_model_open
-                    ))))
-                    .icon_type(IconType::Png)
-                    .style(
-                        "size",
-                        Size {
-                            width: Dimension::Px(34.0),
-                            height: Dimension::Px(34.0),
-                        }
-                    )
-                    .style("background_color", Color::TRANSPARENT)
-                    .style("border_color", Color::TRANSPARENT)
-                    .style("active_color", Color::rgba(85., 85., 85., 0.50))
-                    .style("radius", 10.),
-                lay![
-                    size: [52, 52],
-                    axis_alignment: Alignment::End,
-                    cross_alignment: Alignment::Center,
-                    padding: [0., 0., 0., 2.]
-                ]
-            )),
+            ), // .push(node!(
+               //     IconButton::new("delete_icon")
+               //         .on_click(Box::new(move || msg!(NetworkDetailsMessage::openModel(
+               //             !is_model_open
+               //         ))))
+               //         .icon_type(IconType::Png)
+               //         .style(
+               //             "size",
+               //             Size {
+               //                 width: Dimension::Px(34.0),
+               //                 height: Dimension::Px(34.0),
+               //             }
+               //         )
+               //         .style("background_color", Color::TRANSPARENT)
+               //         .style("border_color", Color::TRANSPARENT)
+               //         .style("active_color", Color::rgba(85., 85., 85., 0.50))
+               //         .style("radius", 10.),
+               //     lay![
+               //         size: [52, 52],
+               //         axis_alignment: Alignment::End,
+               //         cross_alignment: Alignment::Center,
+               //         padding: [0., 0., 0., 2.]
+               //     ]
+               // )),
         );
 
         let mut content_node = node!(
@@ -497,6 +497,19 @@ impl Component for NetworkDetails {
         }
         base = base.push(header_node);
         base = base.push(content_node);
+
+        base = base.push(footer_node!(
+            "back_icon",
+            Box::new(|| msg!(Message::ChangeRoute {
+                route: Routes::Network {
+                    screen: NetworkScreenRoutes::Networking
+                }
+            })),
+            "delete_icon",
+            IconType::Png,
+            Box::new(move || msg!(NetworkDetailsMessage::openModel(!is_model_open)))
+        ));
+
         Some(base)
     }
 
