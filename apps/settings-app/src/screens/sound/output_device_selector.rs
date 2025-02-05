@@ -47,8 +47,8 @@ impl Component for OutputDeviceSelector {
 
         for (i, device) in output_devices.clone().into_iter().enumerate() {
             options.push((
-                txt!(truncate(device.name.clone(), 30)),
-                txt!(truncate(device.name.clone(), 30)),
+                txt!(truncate(device.description.clone(), 30)),
+                txt!(truncate(device.description.clone(), 30)),
             ));
         }
 

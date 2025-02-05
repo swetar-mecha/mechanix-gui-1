@@ -6,7 +6,7 @@ use std::{
 
 use system_shutdown::{hibernate, logout, reboot, shutdown};
 
-use battery::Manager;
+use battery::{units::ratio::ratio, Manager};
 pub struct Power {
     battery: battery::Battery,
 }
@@ -90,21 +90,46 @@ impl Power {
         reader.read_to_string(&mut buffer)?;
         buffer.trim().to_string(); // Remove leading/trailing whitespace
 
+        println!("get_current_cpu_governor result : {:?} ", buffer.clone());
+
         Ok(buffer)
     }
 
     // we need to set the cpu governor by writing to this file /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
     pub fn set_cpu_governor(&self, governor: &str) -> Result<(), std::io::Error> {
-        let governor_path = Path::new("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor");
-        let mut file = File::create(governor_path)?;
-        file.write_all(governor.as_bytes())?;
+        // let governor_path = Path::new("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor");
+        // let mut file = File::create(governor_path)?;
+        // file.write_all(governor.as_bytes())?;
 
+        // Ok(())
+
+        println!("inside set_cpu_governor.... {:?} ", governor);
+        let num_cores = num_cpus::get();
+        println!("inside set_cpu_governor.... {:?} ", num_cores.clone());
+
+        for i in 0..num_cores {
+            let cpu_path = format!("/sys/devices/system/cpu/cpu{}/cpufreq/scaling_governor", i);
+            let governor_path = Path::new(&cpu_path);
+            let mut file = File::create(governor_path)?;
+            // file.write_all(governor.as_bytes())?;
+            match file.write_all(governor.as_bytes()) {
+                Ok(r) => {
+                    println!("set_cpu_governor response: {:?} ", r);
+                }
+                Err(e) => {
+                    println!("Error writing to file: {}", e);
+                }
+            }
+        }
         Ok(())
     }
 
     //get cpu frequency by reading this file /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq
+    // //
     pub fn get_cpu_frequency() -> Result<String, std::io::Error> {
-        let frequency_path = Path::new("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq");
+        // /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+        // // old - /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq
+        let frequency_path = Path::new("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor");
 
         let mut buffer = String::new();
         let file = File::open(frequency_path)?;

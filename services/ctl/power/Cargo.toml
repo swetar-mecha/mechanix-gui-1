@@ -12,4 +12,5 @@ keywords.workspace = true
 
 [dependencies]
 battery = "0.7.8"
+num_cpus = "1.16.0"
 system_shutdown = "*"

@@ -18,6 +18,7 @@ impl PowerBusInterface {
     }
 
     pub async fn set_cpu_governor(&self, governor: String) -> Result<(), ZbusError> {
+        println!("INNN set_cpu_governor {:?} ", governor);
         let power = Power::new();
         let _ = power.set_cpu_governor(&governor);
         Ok(())

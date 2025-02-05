@@ -43,7 +43,7 @@ impl Component for BatteryScreen {
         self.state_mut().route = BatteryScreenRoute::BatteryScreen;
     }
     fn view(&self) -> Option<Node> {
-        let mut current_mode = BatteryModel::get().cureent_mode.get().clone();
+        let current_mode = BatteryModel::get().cureent_mode.get().clone();
 
         let mut base: Node = node!(
             widgets::Div::new().bg(Color::BLACK),

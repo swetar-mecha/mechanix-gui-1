@@ -53,6 +53,7 @@ impl BatteryModel {
             BatteryModel::get().available_modes.set(available_modes);
 
             let current_mode = Power::get_current_cpu_governor().await.unwrap();
+            println!("BATTERY MODEL current_mode {:?}", current_mode);
             let current_mode_value = match current_mode.as_str() {
                 "performance\n" => "High",
                 "powersave\n" => "Low",
@@ -76,11 +77,20 @@ impl BatteryModel {
         println!("Set mode value_map: {:?}", value_map);
 
         RUNTIME.spawn(async {
-            Power::set_cpu_governor(value_map.to_string())
-                .await
-                .unwrap();
-        });
+            // Power::set_cpu_governor(value_map.to_string())
+            //     .await
+            //     .unwrap();
 
-        BatteryModel::update();
+            match Power::set_cpu_governor(value_map.to_string()).await {
+                Ok(r) => {
+                    println!("BATTERY MODEL set_cpu_governor response: {:?} ", r);
+                    BatteryModel::update();
+                }
+                Err(e) => {
+                    println!("BATTERY MODEL set_cpu_governor error: {:?} ", e);
+                    value_map.to_string();
+                }
+            };
+        });
     }
 }
