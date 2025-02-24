@@ -68,14 +68,14 @@ impl BluetoothDevice {
 
 #[derive(Debug)]
 pub struct CentralDevice {
-    name: String,
-    alias: String,
-    address: String,
-    address_type: String,
-    discoverable: bool,
-    pairable: bool,
-    pairable_timeout: u32,
-    powered: bool,
+    pub name: String,
+    pub alias: String,
+    pub address: String,
+    pub address_type: String,
+    pub discoverable: bool,
+    pub pairable: bool,
+    pub pairable_timeout: u32,
+    pub powered: bool,
 }
 
 impl CentralDevice {

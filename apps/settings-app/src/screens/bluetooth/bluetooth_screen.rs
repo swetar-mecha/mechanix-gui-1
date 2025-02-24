@@ -1,28 +1,28 @@
 use crate::{
-    components::ComponentHasher,
-    gui::{Message, NetworkScreenRoutes, Routes},
+    components::*,
+    gui::{BluetoothScreenRoutes, Message, NetworkScreenRoutes, Routes},
     header_node,
     screens::bluetooth::contexts::bluetooth_structures::BluetoothDevice,
+    tab_item_node,
     utils::truncate,
 };
-use core::net;
+
 use std::hash::Hash;
 
-use mctk_core::widgets::Scrollable;
 use mctk_core::{
     component::{self, Component},
-    lay,
+    event, lay,
     layout::{Alignment, Dimension, Direction, Size},
     msg, node, rect, size, size_pct,
     style::{FontWeight, Styled},
     txt,
-    widgets::{self, Div, IconButton, IconType, Text, Toggle},
+    widgets::{self, Button, Div, HDivider, IconButton, IconType, Scrollable, Text, Toggle},
     Color, Node,
 };
-use mctk_core::{event, widgets::HDivider};
-use upower::device;
 
-use super::contexts::bluetooth_context::BluetoothStore;
+use super::{
+    contexts::bluetooth_context::BluetoothStore, rename_central_device::RenameCentralDevice,
+};
 
 pub struct ClicableIconComponent {
     pub on_click: Option<Box<dyn Fn() -> Box<Message> + Send + Sync>>,
@@ -69,16 +69,33 @@ impl BluetoothScreen {
 
 impl Component for BluetoothScreen {
     fn init(&mut self) {
-        BluetoothStore::get_enabled_status();
-        // BluetoothStore::get_managed_objects();
+        BluetoothStore::start_streaming();
+        BluetoothStore::get_managed_objects();
     }
 
     fn render_hash(&self, hasher: &mut ComponentHasher) {
+        BluetoothStore::get()
+            .saved_devices
+            .get()
+            .clone()
+            .len()
+            .hash(hasher);
+
+        BluetoothStore::get()
+            .available_devices
+            .get()
+            .clone()
+            .len()
+            .hash(hasher);
+
         self.props_hash(hasher);
     }
 
     fn view(&self) -> Option<Node> {
         let status = BluetoothStore::get().is_enabled.get().clone();
+
+        let saved_devices = BluetoothStore::get().saved_devices.get().clone();
+        let available_devices = BluetoothStore::get().available_devices.get().clone();
 
         let mut base: Node = node!(
             Div::new(),
@@ -148,10 +165,37 @@ impl Component for BluetoothScreen {
             )),
         );
 
+        let central_device = BluetoothStore::get().central_device.get();
+        let central_device_name = central_device
+            .as_ref()
+            .map(|device| device.name.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let central_device_alias = central_device
+            .as_ref()
+            .map(|device| device.alias.clone())
+            .unwrap_or_else(|| "Unknown".to_string());
+
+        let device_name = if central_device_alias.to_string() != central_device_name.to_string() {
+            central_device_alias.clone()
+        } else {
+            central_device_name.clone()
+        };
+
+        let central_device_row = tab_item_node!(
+            [text_node("Device name")],
+            [text_bold_node(&device_name.clone())],
+            on_click: Some(Box::new(move ||
+                msg!(Message::ChangeRoute {
+                    route: Routes::Bluetooth { screen: crate::gui::BluetoothScreenRoutes::CentralDeviceScreen }
+                })
+            )),
+        );
+
         let mut scrollable_section = node!(
-            Scrollable::new(size!(440, 300)),
+            Scrollable::new(size!(440, 230)),
             lay![
-                size: [440, 300],
+                size: [440, 230],
                 direction: Direction::Column,
                 cross_alignment: Alignment::Stretch,
             ]
@@ -372,21 +416,64 @@ impl Component for BluetoothScreen {
         };
 
         let available_devices_text: Node = node!(
+            Div::new().bg(Color::MID_GREY),
+            lay![
+                size: [440, 28],
+                direction: Direction::Row,
+                axis_alignment: Alignment::Stretch,
+                cross_alignment: Alignment::Stretch,
+            ]
+        )
+        .push(node!(
             Text::new(txt!("Available devices"))
-                .style("color", Color::rgba(197., 197., 197., 1.))
-                .style("size", 10.0)
-                .style("font", "Space Grotesk")
-                .style("font_weight", FontWeight::Normal),
+                .style("color", Color::rgba(250., 251., 252., 1.))
+                .style("font", "Inter")
+                .with_class("text-xl leading-6 font-medium"),
             lay![
                 margin: [2.0, 0.0, 2.0, 0.0],
                 axis_alignment: Alignment::Start
             ]
-        );
+        ))
+        .push(node!(
+            IconButton::new("refresh_icon")
+                .on_click(Box::new(move || {
+                    BluetoothStore::scan_devices();
+                    msg!(Message::ChangeRoute {
+                        route: Routes::Bluetooth {
+                            screen: BluetoothScreenRoutes::BluetoothScreen,
+                        },
+                    })
+                    // Box::new(())
+                }),)
+                .icon_type(IconType::Svg)
+                .style(
+                    "size",
+                    Size {
+                        width: Dimension::Px(34.0),
+                        height: Dimension::Px(34.0),
+                    }
+                )
+                .style("background_color", Color::TRANSPARENT)
+                .style("border_color", Color::TRANSPARENT)
+                .style("active_color", Color::rgba(85., 85., 85., 0.50))
+                .style("radius", 10.),
+            lay![
+                margin: [2.0, 0.0, 2.0, 0.0],
+                axis_alignment: Alignment::End
+            ]
+        ));
 
         content_node = content_node.push(toggle_row);
+        content_node = content_node.push(node!(HDivider {
+            size: 0.8,
+            color: Color::rgba(83., 83., 83., 1.)
+        }));
+        content_node = content_node.push(central_device_row);
+        content_node = content_node.push(node!(HDivider {
+            size: 0.8,
+            color: Color::rgba(83., 83., 83., 1.)
+        }));
 
-        let saved_devices = BluetoothStore::get().saved_devices.get().clone();
-        let available_devices = BluetoothStore::get().available_devices.get().clone();
         if status.to_owned() == true {
             // todo: show connected device row
 
@@ -414,25 +501,36 @@ impl Component for BluetoothScreen {
 
             scrollable_section = scrollable_section.push(available_devices_text);
 
-            for (i, device) in available_devices.clone().into_iter().enumerate() {
-                if device.name.clone().len() > 0 {
-                    let row_node = node!(
-                        Div::new(),
-                        lay![
-                            size: [440, Auto],
-                            direction: Direction::Column,
-                            axis_alignment: Alignment::Stretch,
-                            cross_alignment: Alignment::Stretch,
-                        ],
-                    )
-                    .push(available_row_component(device.clone()).key(i as u64))
-                    .push(node!(HDivider {
-                        size: 0.8,
-                        color: Color::rgba(83., 83., 83., 1.)
-                    }))
-                    .key(2 * i as u64);
+            if available_devices.clone().len() == 0 {
+                scrollable_section = scrollable_section.push(node!(
+                    Div::new(),
+                    lay![
+                        size: [440, 65],
+                        direction: Direction::Row,
+                        cross_alignment: Alignment::Stretch,
+                    ]
+                ))
+            } else if available_devices.clone().len() > 0 {
+                for (i, device) in available_devices.clone().into_iter().enumerate() {
+                    if device.name.clone().len() > 0 {
+                        let row_node = node!(
+                            Div::new(),
+                            lay![
+                                size: [440, Auto],
+                                direction: Direction::Column,
+                                axis_alignment: Alignment::Stretch,
+                                cross_alignment: Alignment::Stretch,
+                            ],
+                        )
+                        .push(available_row_component(device.clone()).key(i as u64))
+                        .push(node!(HDivider {
+                            size: 0.8,
+                            color: Color::rgba(83., 83., 83., 1.)
+                        }))
+                        .key(2 * i as u64);
 
-                    scrollable_section = scrollable_section.push(row_node);
+                        scrollable_section = scrollable_section.push(row_node);
+                    }
                 }
             }
         }
@@ -479,24 +577,4 @@ impl Component for BluetoothScreen {
 
         Some(base)
     }
-}
-
-pub fn get_network_icon(flags: String, signal: Option<String>) -> String {
-    let mut icon = if flags.contains("WPA") {
-        "secured_wireless_strong".to_string()
-    } else {
-        "wireless_strong".to_string()
-    };
-
-    if let Some(signal_str) = signal {
-        if let Ok(signal_strength) = signal_str.parse::<u32>() {
-            if signal_strength < 30 {
-                icon = icon.replace("strong", "low");
-            } else if signal_strength < 70 {
-                icon = icon.replace("strong", "weak");
-            }
-        }
-    }
-
-    icon
 }

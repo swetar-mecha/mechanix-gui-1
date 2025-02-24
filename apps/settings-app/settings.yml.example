@@ -52,6 +52,7 @@ modules:
       error: /usr/share/mechanix/apps/settings/assets/icons/wireless/secured/secured_wireless_error_icon.png
   bluetooth:
     icon: /usr/share/mechanix/apps/settings/assets/icons/bluetooth_off_icon.svg
+    refresh: /usr/share/mechanix/apps/settings/assets/icons/refresh_icon.svg
   display:
     icon: /usr/share/mechanix/apps/settings/assets/icons/display_icon.png
   appearance:

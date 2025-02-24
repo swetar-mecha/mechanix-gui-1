@@ -183,6 +183,10 @@ async fn main() -> anyhow::Result<()> {
         svgs.insert("bluetooth_icon".to_string(), icon);
     }
 
+    if let icon = modules.bluetooth.refresh {
+        svgs.insert("refresh_icon".to_string(), icon);
+    }
+
     assets.insert(
         "display_icon".to_string(),
         AssetParams::new(modules.display.icon),
