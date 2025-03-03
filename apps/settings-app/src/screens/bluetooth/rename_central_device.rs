@@ -133,7 +133,7 @@ impl Component for RenameCentralDevice {
             Box::new(|| {
                 msg!(Message::ChangeRoute {
                     route: Routes::Bluetooth {
-                        screen: BluetoothScreenRoutes::BluetoothScreen
+                        screen: BluetoothScreenRoutes::BluetoothSettings
                     }
                 })
             }),
@@ -145,7 +145,7 @@ impl Component for RenameCentralDevice {
 
                     return msg!(Message::ChangeRoute {
                         route: Routes::Bluetooth {
-                            screen: BluetoothScreenRoutes::BluetoothScreen,
+                            screen: BluetoothScreenRoutes::BluetoothSettings,
                         },
                     });
                 } else {

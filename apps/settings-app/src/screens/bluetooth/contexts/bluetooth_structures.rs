@@ -8,6 +8,7 @@ pub struct BluetoothDevice {
     pub icon: String,
     pub trusted: bool,
     pub paired: bool,
+    pub connected: bool,
     pub powered: Option<bool>,
 }
 
@@ -54,6 +55,10 @@ impl BluetoothDevice {
                 .unwrap_or_default(),
             paired: device_properties
                 .get("Paired")
+                .and_then(|v| v.downcast_ref::<bool>().ok()) // Convert Result<String, Error> to Option<String>
+                .unwrap_or_default(),
+            connected: device_properties
+                .get("Connected")
                 .and_then(|v| v.downcast_ref::<bool>().ok()) // Convert Result<String, Error> to Option<String>
                 .unwrap_or_default(),
             powered: Some(

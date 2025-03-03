@@ -3,7 +3,8 @@ use crate::{
         about::about_device::AboutDevice,
         battery::battery_screen::{BatteryScreen, BatteryScreenRoute},
         bluetooth::{
-            bluetooth_screen::BluetoothScreen, rename_central_device::RenameCentralDevice,
+            bluetooth_screen::BluetoothScreen, bluetooth_settings::BluetoothSettings,
+            rename_central_device::RenameCentralDevice,
         },
         display::display_screen::{DisplayScreen, DisplayScreenRoute},
         network::{
@@ -57,8 +58,8 @@ pub enum BluetoothScreenRoutes {
     #[default]
     BluetoothScreen,
     CentralDeviceScreen,
-    // BluetoothPairingEnterCode,
-    // BluetoothPairingVerifyCode,
+    BluetoothSettings, // BluetoothPairingEnterCode,
+                       // BluetoothPairingVerifyCode,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -177,6 +178,9 @@ impl Component for SettingsApp {
                 }
                 BluetoothScreenRoutes::CentralDeviceScreen => {
                     base = base.push(node!(RenameCentralDevice::new()))
+                }
+                BluetoothScreenRoutes::BluetoothSettings => {
+                    base = base.push(node!(BluetoothSettings::new()))
                 }
             },
             _ => (),

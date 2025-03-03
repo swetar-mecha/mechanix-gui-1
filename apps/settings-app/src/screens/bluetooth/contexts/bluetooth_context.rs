@@ -1,36 +1,74 @@
+use core::fmt;
 use std::thread;
 use std::time::Duration;
 
+use crate::screens::bluetooth::bluetooth_dbus::bluetooth_agent::{agent1, agent_manager1};
+use crate::screens::bluetooth::bluetooth_dbus::bluetooth_device::device1::Device1Proxy;
+use crate::screens::bluetooth::bluetooth_dbus::bluez_proxy::{self, BluezProxy};
+use crate::screens::bluetooth::bluetooth_dbus::central_device::adapter1::{self, Adapter1Proxy};
+use crate::screens::bluetooth::contexts::bluetooth_structures::{BluetoothDevice, CentralDevice};
 use futures::StreamExt;
 use lazy_static::lazy_static;
 use mctk_core::context::Context;
 use mctk_macros::Model;
 use tokio::runtime::Runtime;
+use tokio::sync::oneshot;
+use upower::device;
+use zbus::blocking::proxy;
+use zbus::fdo;
+use zbus::zvariant::ObjectPath;
 
-use crate::screens::bluetooth::bluetooth_dbus::bluez_proxy::{self, BluezProxy};
-use crate::screens::bluetooth::bluetooth_dbus::central_device::adapter1::{self, Adapter1Proxy};
-use crate::screens::bluetooth::contexts::bluetooth_structures::{BluetoothDevice, CentralDevice};
+// use super::bluetooth_structures::DbusBluetoothDevice;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BluetoothDeviceState {
+    Saved,
+    Connecting,
+    Disconnecting,
+    Connected,
+    Unknown,
+}
+
+impl fmt::Display for BluetoothDeviceState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BluetoothDeviceState::Saved => write!(f, "Saved"),
+            BluetoothDeviceState::Connecting => write!(f, "Connecting.."),
+            BluetoothDeviceState::Connected => write!(f, "Connected"),
+            BluetoothDeviceState::Disconnecting => write!(f, "Disconnecting.."),
+            BluetoothDeviceState::Unknown => write!(f, ""),
+        }
+    }
+}
 
 lazy_static! {
     static ref RUNTIME: Runtime = Runtime::new().unwrap();
     static ref WIRELESS_MODEL: BluetoothStore = BluetoothStore {
         is_enabled: Context::new(false),
+        device_state: Context::new(BluetoothDeviceState::Saved),
         is_streaming: Context::new(false),
         saved_devices: Context::new(vec![]),
+        connected_devices: Context::new(vec![]),
         available_devices: Context::new(vec![]),
         central_device: Context::new(None),
         central_device_name: Context::new("".to_string()),
+        central_device_alias: Context::new("".to_string()),
     };
 }
+
+const AGENT_PATH: &str = "/org/bluez/agent/cosmic";
 
 #[derive(Model)]
 pub struct BluetoothStore {
     pub is_enabled: Context<bool>,
+    pub device_state: Context<BluetoothDeviceState>,
     pub is_streaming: Context<bool>,
     pub saved_devices: Context<Vec<BluetoothDevice>>,
+    pub connected_devices: Context<Vec<BluetoothDevice>>,
     pub available_devices: Context<Vec<BluetoothDevice>>,
     pub central_device: Context<Option<CentralDevice>>,
     pub central_device_name: Context<String>,
+    pub central_device_alias: Context<String>,
 }
 
 impl BluetoothStore {
@@ -43,6 +81,7 @@ impl BluetoothStore {
             let connection = zbus::Connection::system().await.unwrap();
             let adapter1_proxy = Adapter1Proxy::new(&connection).await.unwrap();
             let powered = adapter1_proxy.powered().await.unwrap();
+
             // println!("get_enabled_status powered: {:?}", powered.clone());
             BluetoothStore::get().is_enabled.set(powered);
 
@@ -93,7 +132,7 @@ impl BluetoothStore {
                 Ok(_) => {
                     BluetoothStore::get().is_enabled.set(!is_enabled);
                     if !is_enabled == true {
-                        BluetoothStore::get_managed_objects();
+                        BluetoothStore::scan_devices();
                     } else {
                         BluetoothStore::get().is_streaming.set(false);
                     }
@@ -116,6 +155,7 @@ impl BluetoothStore {
 
             let mut available_devices: Vec<BluetoothDevice> = vec![];
             let mut saved_devices: Vec<BluetoothDevice> = vec![];
+            let mut connected_devices: Vec<BluetoothDevice> = vec![];
             // let mut saved_devices: Vec<Option<BluetoothDevice>> = vec![];
 
             // println!("BluetoothStore:: INSIDE GET MANAGED OBJECTS------- {}", managed_objects);
@@ -126,31 +166,52 @@ impl BluetoothStore {
                 // println!(" =====> object_path: {:?}", object_path);
 
                 if let Some(device_properties) = interfaces.get("org.bluez.Device1") {
-                    let paired: bool = device_properties
-                        .get("Paired")
-                        .unwrap()
-                        .downcast_ref()
-                        .unwrap();
+                    // let paired: bool = device_properties
+                    //     .get("Paired")
+                    //     .unwrap()
+                    //     .downcast_ref()
+                    //     .unwrap();
+
+                    // let connected: bool = device_properties
+                    //     .get("Connected")
+                    //     .unwrap()
+                    //     .downcast_ref()
+                    //     .unwrap();
 
                     if let Some(device) = BluetoothDevice::from_properties(device_properties) {
-                        match paired {
-                            true => saved_devices.push(device),
-                            false => available_devices.push(device),
+                        // match device.paired {
+                        //     true => saved_devices.push(device),
+                        //     false => available_devices.push(device),
+                        // }
+
+                        match device.connected {
+                            true => connected_devices.push(device),
+                            false => match device.paired {
+                                true => saved_devices.push(device),
+                                false => available_devices.push(device),
+                            },
                         }
                     }
                 } else if let Some(adapter_properties) = interfaces.get("org.bluez.Adapter1") {
                     let device: Option<CentralDevice> =
                         CentralDevice::from_properties(adapter_properties);
                     let name = device.as_ref().map(|dev| dev.name.clone());
+                    let alias = device.as_ref().map(|dev| dev.alias.clone());
 
                     BluetoothStore::get().central_device.set(device);
                     if let Some(name) = name {
                         BluetoothStore::get().central_device_name.set(name);
                     }
+                    if let Some(alias) = alias {
+                        BluetoothStore::get().central_device_alias.set(alias);
+                    }
                 }
             }
 
             BluetoothStore::get().saved_devices.set(saved_devices);
+            BluetoothStore::get()
+                .connected_devices
+                .set(connected_devices);
             BluetoothStore::get()
                 .available_devices
                 .set(available_devices);
@@ -182,12 +243,132 @@ impl BluetoothStore {
 
             match proxy.set_alias(&value).await {
                 Ok(r) => {
-                    BluetoothStore::get().central_device_name.set(value);
+                    BluetoothStore::get().central_device_alias.set(value);
                     println!("DEVICE NAME UPDATED {:?} ", r);
                     return;
                 }
                 Err(e) => eprintln!("set_alias error {:?} ", &e),
             };
+        });
+    }
+
+    pub fn connect_device(device_address: String) {
+        RUNTIME.spawn(async move {
+            println!("connect_device called....{:?} ", device_address.clone());
+
+            BluetoothStore::get()
+                .device_state
+                .set(BluetoothDeviceState::Connecting);
+
+            let connection = zbus::Connection::system().await.unwrap();
+            let device_path_str =
+                format!("/org/bluez/hci0/dev_{}", device_address.replace(":", "_"));
+            println!("device_path_str {:?} ", device_path_str);
+
+            let device_path =
+                ObjectPath::try_from(device_path_str.as_str()).expect("Invalid object path");
+
+            let device_proxy_builder = Device1Proxy::builder(&connection)
+                .destination("org.bluez")
+                .unwrap()
+                .path(&device_path)
+                .unwrap()
+                .interface("org.bluez.Device1");
+
+            let device_proxy = device_proxy_builder.unwrap().build().await.unwrap();
+
+            // device_proxy.connect().await.unwrap();
+            let paired = device_proxy.paired().await.unwrap();
+            if paired == false {
+                let pair_resp = match device_proxy.pair().await {
+                    Ok(r) => println!("PAIR DONE {:?} ", r),
+                    Err(e) => {
+                        eprintln!("PAIR ERROR: {:?}", e);
+                    }
+                };
+                println!("pair_resp : {:?} ", pair_resp);
+                device_proxy.set_trusted(true).await.unwrap();
+            }
+            match device_proxy.connect().await {
+                Ok(r) => {
+                    println!("CONNECTED {:?} ", r);
+                    BluetoothStore::get()
+                        .device_state
+                        .set(BluetoothDeviceState::Connected);
+                    Self::scan_devices();
+                }
+                Err(e) => {
+                    BluetoothStore::get()
+                        .device_state
+                        .set(BluetoothDeviceState::Unknown);
+                    eprintln!("ERROR IN CONNECTING DEVICE {:?}", e.to_string());
+                }
+            }
+        });
+    }
+
+    pub fn disconnect_device(device_address: String) {
+        RUNTIME.spawn(async move {
+            println!("disconnect_device called....{:?} ", device_address.clone());
+            BluetoothStore::get()
+                .device_state
+                .set(BluetoothDeviceState::Disconnecting);
+
+            let connection = zbus::Connection::system().await.unwrap();
+            let device_path_str =
+                format!("/org/bluez/hci0/dev_{}", device_address.replace(":", "_"));
+            println!("device_path_str {:?} ", device_path_str);
+
+            let device_path =
+                ObjectPath::try_from(device_path_str.as_str()).expect("Invalid object path");
+
+            let device_proxy_builder = Device1Proxy::builder(&connection)
+                .destination("org.bluez")
+                .unwrap()
+                .path(&device_path)
+                .unwrap()
+                .interface("org.bluez.Device1");
+
+            let device_proxy = device_proxy_builder.unwrap().build().await.unwrap();
+
+            match device_proxy.disconnect().await {
+                Ok(r) => {
+                    println!("DISCONNECTED {:?} ", r);
+                    Self::scan_devices();
+                    BluetoothStore::get()
+                        .device_state
+                        .set(BluetoothDeviceState::Saved);
+                }
+                Err(e) => {
+                    BluetoothStore::get()
+                        .device_state
+                        .set(BluetoothDeviceState::Saved);
+                    eprintln!("ERROR IN CONNECTING DEVICE {:?}", e.to_string());
+                }
+            }
+        });
+    }
+
+    pub fn remove_device(device_address: String) {
+        RUNTIME.spawn(async move {
+            println!("remove_device called....{:?} ", device_address.clone());
+            let connection = zbus::Connection::system().await.unwrap();
+            let device_path_str =
+                format!("/org/bluez/hci0/dev_{}", device_address.replace(":", "_"));
+            println!("device_path_str {:?} ", device_path_str);
+
+            let device_path =
+                ObjectPath::try_from(device_path_str.as_str()).expect("Invalid object path");
+
+            let adapter1_proxy = Adapter1Proxy::new(&connection).await.unwrap();
+
+            match adapter1_proxy.remove_device(&device_path).await {
+                Ok(r) => {
+                    println!("REMOVED device {:?} ", r);
+                    Self::scan_devices();
+                }
+                Err(e) => eprintln!("ERROR IN CONNECTING DEVICE {:?}", e.to_string()),
+            }
         });
     }
 

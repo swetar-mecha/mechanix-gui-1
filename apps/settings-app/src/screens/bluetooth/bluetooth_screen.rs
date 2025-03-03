@@ -2,7 +2,9 @@ use crate::{
     components::*,
     gui::{BluetoothScreenRoutes, Message, NetworkScreenRoutes, Routes},
     header_node,
-    screens::bluetooth::contexts::bluetooth_structures::BluetoothDevice,
+    screens::bluetooth::contexts::{
+        bluetooth_context::BluetoothDeviceState, bluetooth_structures::BluetoothDevice,
+    },
     tab_item_node,
     utils::truncate,
 };
@@ -20,9 +22,7 @@ use mctk_core::{
     Color, Node,
 };
 
-use super::{
-    contexts::bluetooth_context::BluetoothStore, rename_central_device::RenameCentralDevice,
-};
+use super::contexts::bluetooth_context::BluetoothStore;
 
 pub struct ClicableIconComponent {
     pub on_click: Option<Box<dyn Fn() -> Box<Message> + Send + Sync>>,
@@ -94,6 +94,7 @@ impl Component for BluetoothScreen {
     fn view(&self) -> Option<Node> {
         let status = BluetoothStore::get().is_enabled.get().clone();
 
+        let connected_devices = BluetoothStore::get().connected_devices.get().clone();
         let saved_devices = BluetoothStore::get().saved_devices.get().clone();
         let available_devices = BluetoothStore::get().available_devices.get().clone();
 
@@ -165,37 +166,10 @@ impl Component for BluetoothScreen {
             )),
         );
 
-        let central_device = BluetoothStore::get().central_device.get();
-        let central_device_name = central_device
-            .as_ref()
-            .map(|device| device.name.clone())
-            .unwrap_or_else(|| "Unknown".to_string());
-
-        let central_device_alias = central_device
-            .as_ref()
-            .map(|device| device.alias.clone())
-            .unwrap_or_else(|| "Unknown".to_string());
-
-        let device_name = if central_device_alias.to_string() != central_device_name.to_string() {
-            central_device_alias.clone()
-        } else {
-            central_device_name.clone()
-        };
-
-        let central_device_row = tab_item_node!(
-            [text_node("Device name")],
-            [text_bold_node(&device_name.clone())],
-            on_click: Some(Box::new(move ||
-                msg!(Message::ChangeRoute {
-                    route: Routes::Bluetooth { screen: crate::gui::BluetoothScreenRoutes::CentralDeviceScreen }
-                })
-            )),
-        );
-
         let mut scrollable_section = node!(
-            Scrollable::new(size!(440, 230)),
+            Scrollable::new(size!(440, 300)),
             lay![
-                size: [440, 230],
+                size: [440, 300],
                 direction: Direction::Column,
                 cross_alignment: Alignment::Stretch,
             ]
@@ -210,6 +184,13 @@ impl Component for BluetoothScreen {
         ));
 
         let saved_row_component = |device: BluetoothDevice| {
+            let mut device_state = BluetoothStore::get().device_state.get().clone();
+
+            if device.connected == true {
+                device_state = BluetoothDeviceState::Connected;
+            }
+
+            let device_address = device.address.clone();
             node!(
                 Div::new(),
                 lay![
@@ -222,10 +203,14 @@ impl Component for BluetoothScreen {
             .push(
                 node!(ClicableIconComponent {
                     on_click: Some(Box::new(move || {
-                        // WirelessModel::connect_to_saved_network(ssid.clone());
+                        if device.connected == true {
+                            BluetoothStore::disconnect_device(device_address.clone());
+                        } else {
+                            BluetoothStore::connect_device(device_address.clone());
+                        }
                         msg!(Message::ChangeRoute {
-                            route: Routes::Network {
-                                screen: NetworkScreenRoutes::Networking
+                            route: Routes::Bluetooth {
+                                screen: crate::gui::BluetoothScreenRoutes::BluetoothScreen
                             }
                         })
                     }))
@@ -259,7 +244,7 @@ impl Component for BluetoothScreen {
                     ))
                     .push(node!(
                         // mini status
-                        Text::new(txt!("Saved"))
+                        Text::new(txt!(device_state.to_string()))
                             .style("color", Color::WHITE)
                             .style("font", "Inter")
                             .with_class("text-sm leading-5 font-normal"),
@@ -282,14 +267,18 @@ impl Component for BluetoothScreen {
                     ]
                 )
                 .push(node!(
-                    IconButton::new("info_icon")
-                        // .on_click(Box::new(move || msg!(Message::ChangeRoute {
-                        //     route: Routes::Network {
-                        //         screen: NetworkScreenRoutes::SavedNetworkDetails {
-                        //             mac: network.mac.clone()
-                        //         }
-                        //     }
-                        // })))
+                    IconButton::new("delete_icon")
+                        .on_click(Box::new({
+                            move || {
+                                let device_address_clone = device.address.clone();
+                                BluetoothStore::remove_device(device_address_clone);
+                                msg!(Message::ChangeRoute {
+                                    route: Routes::Bluetooth {
+                                        screen: BluetoothScreenRoutes::BluetoothScreen,
+                                    },
+                                })
+                            }
+                        }),)
                         .icon_type(IconType::Png)
                         .style(
                             "size",
@@ -326,11 +315,13 @@ impl Component for BluetoothScreen {
             .push(
                 node!(ClicableIconComponent {
                     on_click: Some(Box::new(move || {
+                        BluetoothStore::connect_device(device.address.to_string());
                         msg!(Message::ChangeRoute {
-                            route: Routes::Network {
-                                screen: NetworkScreenRoutes::Networking
+                            route: Routes::Bluetooth {
+                                screen: crate::gui::BluetoothScreenRoutes::BluetoothScreen
                             }
                         })
+
                         // if network.flags.clone().to_lowercase().contains("open") {
                         //     WirelessModel::connect_to_open_network(ssid.clone());
                         //     msg!(Message::ChangeRoute {
@@ -384,44 +375,44 @@ impl Component for BluetoothScreen {
                         cross_alignment:Alignment::Center,
                         padding: [0. , 0., 0., 10.]
                     ]
-                )
-                .push(node!(
-                    IconButton::new("info_icon")
-                        // .on_click(Box::new(move || msg!(Message::ChangeRoute {
-                        //     route: Routes::Network {
-                        //         screen: NetworkScreenRoutes::UnknownNetworkDetails {
-                        //             mac: network.mac.clone()
-                        //         }
-                        //     }
-                        // })))
-                        .icon_type(IconType::Png)
-                        .style(
-                            "size",
-                            Size {
-                                width: Dimension::Px(34.0),
-                                height: Dimension::Px(34.0),
-                            }
-                        )
-                        .style("background_color", Color::TRANSPARENT)
-                        .style("border_color", Color::TRANSPARENT)
-                        .style("active_color", Color::rgba(85., 85., 85., 0.50))
-                        .style("radius", 10.),
-                    lay![
-                        size: [52, 52],
-                        axis_alignment: Alignment::End,
-                        cross_alignment: Alignment::Center,
-                    ]
-                )),
+                ), // .push(node!(
+                   //     IconButton::new("info_icon")
+                   //         // .on_click(Box::new(move || msg!(Message::ChangeRoute {
+                   //         //     route: Routes::Network {
+                   //         //         screen: NetworkScreenRoutes::UnknownNetworkDetails {
+                   //         //             mac: network.mac.clone()
+                   //         //         }
+                   //         //     }
+                   //         // })))
+                   //         .icon_type(IconType::Png)
+                   //         .style(
+                   //             "size",
+                   //             Size {
+                   //                 width: Dimension::Px(34.0),
+                   //                 height: Dimension::Px(34.0),
+                   //             }
+                   //         )
+                   //         .style("background_color", Color::TRANSPARENT)
+                   //         .style("border_color", Color::TRANSPARENT)
+                   //         .style("active_color", Color::rgba(85., 85., 85., 0.50))
+                   //         .style("radius", 10.),
+                   //     lay![
+                   //         size: [52, 52],
+                   //         axis_alignment: Alignment::End,
+                   //         cross_alignment: Alignment::Center,
+                   //     ]
+                   // )),
             )
         };
 
         let available_devices_text: Node = node!(
-            Div::new().bg(Color::MID_GREY),
+            Div::new().bg(Color::TRANSPARENT),
             lay![
-                size: [440, 28],
+                size: [440, 30],
                 direction: Direction::Row,
                 axis_alignment: Alignment::Stretch,
                 cross_alignment: Alignment::Stretch,
+                margin: [5., 0., 0., 0.]
             ]
         )
         .push(node!(
@@ -468,7 +459,7 @@ impl Component for BluetoothScreen {
             size: 0.8,
             color: Color::rgba(83., 83., 83., 1.)
         }));
-        content_node = content_node.push(central_device_row);
+        // content_node = content_node.push(central_device_row);
         content_node = content_node.push(node!(HDivider {
             size: 0.8,
             color: Color::rgba(83., 83., 83., 1.)
@@ -477,6 +468,30 @@ impl Component for BluetoothScreen {
         if status.to_owned() == true {
             // todo: show connected device row
 
+            // connected
+            for (i, device) in connected_devices.clone().into_iter().enumerate() {
+                if device.name.clone().len() > 0 {
+                    let row_node = node!(
+                        Div::new(),
+                        lay![
+                            size: [440, Auto],
+                            direction: Direction::Column,
+                            axis_alignment: Alignment::Stretch,
+                            cross_alignment: Alignment::Stretch,
+                        ],
+                    )
+                    .push(saved_row_component(device.clone()).key(i as u64))
+                    .push(node!(HDivider {
+                        size: 0.8,
+                        color: Color::rgba(83., 83., 83., 1.)
+                    }))
+                    .key(2 * i as u64);
+
+                    scrollable_section = scrollable_section.push(row_node);
+                }
+            }
+
+            // saved
             for (i, device) in saved_devices.clone().into_iter().enumerate() {
                 if device.name.clone().len() > 0 {
                     let row_node = node!(
@@ -549,18 +564,19 @@ impl Component for BluetoothScreen {
                 Box::new(|| msg!(Message::ChangeRoute {
                     route: Routes::SettingsList
                 })),
-                "add_icon",
-                Box::new(|| msg!(Message::ChangeRoute {
-                    route: Routes::Network {
-                        screen: NetworkScreenRoutes::AddNetwork {
-                            ssid: "".to_string()
-                        }
-                    }
-                })),
+                // "add_icon",
+                // Box::new(|| msg!(Message::ChangeRoute {
+                //     route: Routes::Network {
+                //         screen: NetworkScreenRoutes::AddNetwork {
+                //             ssid: "".to_string()
+                //         }
+                //     }
+                // })),
                 "wireless_settings",
+                IconType::Png,
                 Box::new(|| msg!(Message::ChangeRoute {
-                    route: Routes::Network {
-                        screen: NetworkScreenRoutes::NetworkSettings
+                    route: Routes::Bluetooth {
+                        screen: BluetoothScreenRoutes::BluetoothSettings
                     }
                 }))
             ));
