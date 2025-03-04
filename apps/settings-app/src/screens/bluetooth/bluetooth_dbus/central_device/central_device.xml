@@ -1,0 +1,37 @@
+<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+"http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+<node><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg name="xml" type="s" direction="out"/>
+</method></interface><interface name="org.bluez.Adapter1"><method name="StartDiscovery"></method><method name="SetDiscoveryFilter"><arg name="properties" type="a{sv}" direction="in"/>
+</method><method name="StopDiscovery"></method><method name="RemoveDevice"><arg name="device" type="o" direction="in"/>
+</method><method name="GetDiscoveryFilters"><arg name="filters" type="as" direction="out"/>
+</method><property name="Address" type="s" access="read"></property><property name="AddressType" type="s" access="read"></property><property name="Name" type="s" access="read"></property><property name="Alias" type="s" access="readwrite"></property><property name="Class" type="u" access="read"></property><property name="Powered" type="b" access="readwrite"></property><property name="Discoverable" type="b" access="readwrite"></property><property name="DiscoverableTimeout" type="u" access="readwrite"></property><property name="Pairable" type="b" access="readwrite"></property><property name="PairableTimeout" type="u" access="readwrite"></property><property name="Discovering" type="b" access="read"></property><property name="UUIDs" type="as" access="read"></property><property name="Modalias" type="s" access="read"></property><property name="Roles" type="as" access="read"></property><property name="ExperimentalFeatures" type="as" access="read"></property></interface><interface name="org.freedesktop.DBus.Properties"><method name="Get"><arg name="interface" type="s" direction="in"/>
+<arg name="name" type="s" direction="in"/>
+<arg name="value" type="v" direction="out"/>
+</method><method name="Set"><arg name="interface" type="s" direction="in"/>
+<arg name="name" type="s" direction="in"/>
+<arg name="value" type="v" direction="in"/>
+</method><method name="GetAll"><arg name="interface" type="s" direction="in"/>
+<arg name="properties" type="a{sv}" direction="out"/>
+</method><signal name="PropertiesChanged"><arg name="interface" type="s"/>
+<arg name="changed_properties" type="a{sv}"/>
+<arg name="invalidated_properties" type="as"/>
+</signal>
+</interface><interface name="org.bluez.GattManager1"><method name="RegisterApplication"><arg name="application" type="o" direction="in"/>
+<arg name="options" type="a{sv}" direction="in"/>
+</method><method name="UnregisterApplication"><arg name="application" type="o" direction="in"/>
+</method></interface><interface name="org.bluez.Media1"><method name="RegisterEndpoint"><arg name="endpoint" type="o" direction="in"/>
+<arg name="properties" type="a{sv}" direction="in"/>
+</method><method name="UnregisterEndpoint"><arg name="endpoint" type="o" direction="in"/>
+</method><method name="RegisterPlayer"><arg name="player" type="o" direction="in"/>
+<arg name="properties" type="a{sv}" direction="in"/>
+</method><method name="UnregisterPlayer"><arg name="player" type="o" direction="in"/>
+</method><method name="RegisterApplication"><arg name="application" type="o" direction="in"/>
+<arg name="options" type="a{sv}" direction="in"/>
+</method><method name="UnregisterApplication"><arg name="application" type="o" direction="in"/>
+</method><property name="SupportedUUIDs" type="as" access="read"></property></interface><interface name="org.bluez.NetworkServer1"><method name="Register"><arg name="uuid" type="s" direction="in"/>
+<arg name="bridge" type="s" direction="in"/>
+</method><method name="Unregister"><arg name="uuid" type="s" direction="in"/>
+</method></interface><interface name="org.bluez.LEAdvertisingManager1"><method name="RegisterAdvertisement"><arg name="advertisement" type="o" direction="in"/>
+<arg name="options" type="a{sv}" direction="in"/>
+</method><method name="UnregisterAdvertisement"><arg name="service" type="o" direction="in"/>
+</method><property name="ActiveInstances" type="y" access="read"></property><property name="SupportedInstances" type="y" access="read"></property><property name="SupportedIncludes" type="as" access="read"></property><property name="SupportedSecondaryChannels" type="as" access="read"></property></interface><node name="dev_00_1E_7C_94_B4_61"/><node name="dev_00_9C_C0_26_71_D8"/><node name="dev_08_E7_85_7E_FF_FB"/><node name="dev_14_55_B9_B9_9B_AC"/><node name="dev_15_91_D8_D2_E3_D9"/><node name="dev_20_CD_6E_84_D7_4E"/><node name="dev_28_BB_ED_03_40_48"/><node name="dev_2B_7E_FC_F7_01_55"/><node name="dev_2C_A7_74_F8_D6_E9"/><node name="dev_2C_BE_EB_C3_97_D4"/><node name="dev_38_45_54_A6_65_56"/><node name="dev_3C_DE_14_CD_9B_E6"/><node name="dev_40_EC_93_4A_C0_2C"/><node name="dev_40_F8_4D_33_BE_A9"/><node name="dev_41_42_7E_77_75_B2"/><node name="dev_44_D9_90_C2_CE_FD"/><node name="dev_4C_82_A9_15_12_0D"/><node name="dev_55_8E_1A_BD_F1_8B"/><node name="dev_56_70_E8_E7_8E_B4"/><node name="dev_58_CD_C9_81_D0_9B"/><node name="dev_67_60_03_94_62_1E"/><node name="dev_6A_16_17_C8_F4_0A"/><node name="dev_6D_59_22_D2_24_F4"/><node name="dev_74_33_57_91_76_B6"/><node name="dev_80_5F_8E_1F_68_6B"/><node name="dev_94_32_51_21_31_9B"/><node name="dev_B9_C0_0F_3D_EA_52"/><node name="dev_CE_4A_D2_F9_D0_7F"/><node name="dev_D0_65_78_81_80_52"/><node name="dev_D0_EF_76_2A_85_FA"/><node name="dev_D5_1B_FB_B8_33_0E"/><node name="dev_D8_B3_2F_1B_15_C7"/><node name="dev_E0_DF_B5_F8_E6_0C"/><node name="dev_E1_B5_C1_84_D1_31"/><node name="dev_FC_A8_9B_20_40_5F"/></node>

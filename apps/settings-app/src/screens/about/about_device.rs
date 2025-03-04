@@ -12,7 +12,7 @@ use mctk_core::{
     msg, node, rect, size, size_pct,
     style::{FontWeight, Styled},
     txt,
-    widgets::{self, Div, IconButton, IconType, Text},
+    widgets::{self, Div, HDivider, IconButton, IconType, Text},
     Color, Node,
 };
 

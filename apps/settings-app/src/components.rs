@@ -2,9 +2,8 @@ use crate::gui::{Message, Routes};
 pub use mctk_core::component::*;
 pub use mctk_core::layout::*;
 pub use mctk_core::style::*;
-pub use mctk_core::widgets::*;
+pub use mctk_core::widgets::{HDivider, *};
 pub use mctk_core::*;
-// use mctk_core::widgets::VDivider;
 
 #[derive(Default, Debug, Clone)]
 pub struct ScreenRoute {
