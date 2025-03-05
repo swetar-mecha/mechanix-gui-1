@@ -1,0 +1,24 @@
+[package]
+name = "mechanix-portal-bluetooth"
+description = "Mechanix portal bluetooth component for the Mechanix shell"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[dependencies]
+futures-channel = "0.3.30"
+futures-util = "0.3.30"
+tracing =  { workspace = true }
+zbus = { version = "4.2.1" }
+tokio =  { workspace = true }
+tracing-subscriber =  { workspace = true }
+anyhow =  { workspace = true }
+mctk_core = { workspace = true }
+mctk_smithay = { workspace = true }
+mctk_macros = { workspace = true }
+bluetoothmanager = { workspace = true }

@@ -10,7 +10,7 @@ use std::time::Duration;
 use crate::bluetooth_agent::adapter1::Adapter1Proxy;
 use crate::bluetooth_device::device1::Device1Proxy;
 use crate::bluetooth_devices::BluezProxy;
-use bluetooth_structures::{BluetoothDevice, CentralDevice};
+use bluetooth_structures::{BluetoothDevice, BluetoothDeviceProps, CentralDevice};
 use futures::StreamExt;
 use lazy_static::lazy_static;
 use mctk_core::context::Context;
@@ -62,9 +62,9 @@ pub struct BluetoothStore {
     pub is_enabled: Context<bool>,
     pub device_state: Context<BluetoothDeviceState>,
     pub is_streaming: Context<bool>,
-    pub saved_devices: Context<Vec<BluetoothDevice>>,
-    pub connected_devices: Context<Vec<BluetoothDevice>>,
-    pub available_devices: Context<Vec<BluetoothDevice>>,
+    pub saved_devices: Context<Vec<BluetoothDeviceProps>>,
+    pub connected_devices: Context<Vec<BluetoothDeviceProps>>,
+    pub available_devices: Context<Vec<BluetoothDeviceProps>>,
     pub central_device: Context<Option<CentralDevice>>,
     pub central_device_name: Context<String>,
     pub central_device_alias: Context<String>,
@@ -131,9 +131,9 @@ impl BluetoothStore {
             let bluetooth_proxy = BluezProxy::new(&connection).await.unwrap();
             let managed_objects = bluetooth_proxy.get_managed_objects().await.unwrap();
 
-            let mut available_devices: Vec<BluetoothDevice> = vec![];
-            let mut saved_devices: Vec<BluetoothDevice> = vec![];
-            let mut connected_devices: Vec<BluetoothDevice> = vec![];
+            let mut available_devices: Vec<BluetoothDeviceProps> = vec![];
+            let mut saved_devices: Vec<BluetoothDeviceProps> = vec![];
+            let mut connected_devices: Vec<BluetoothDeviceProps> = vec![];
 
             for (object_path, interfaces) in managed_objects.iter() {
                 // for (interface, properties) in interfaces.iter() {
@@ -142,7 +142,7 @@ impl BluetoothStore {
                 // println!(" =====> object_path: {:?}", object_path);
 
                 if let Some(device_properties) = interfaces.get("org.bluez.Device1") {
-                    if let Some(device) = BluetoothDevice::from_properties(device_properties) {
+                    if let Some(device) = BluetoothDeviceProps::from_properties(device_properties) {
                         //     true => saved_devices.push(device),
                         //     false => available_devices.push(device),
                         // }
@@ -361,6 +361,15 @@ impl BluetoothStore {
                 }
             }
         });
+    }
+
+
+
+    pub async fn get_device<'a>(
+        connection: &zbus::Connection,
+        device_path: zbus::zvariant::OwnedObjectPath,
+    ) -> zbus::Result<BluetoothDevice<'a>> {
+        BluetoothDevice::new(connection, device_path.into()).await
     }
 
     pub fn start_streaming() {

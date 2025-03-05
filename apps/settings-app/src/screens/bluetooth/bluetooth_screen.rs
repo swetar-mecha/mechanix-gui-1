@@ -8,7 +8,7 @@ use crate::{
 use std::hash::Hash;
 
 use bluetoothmanager::{
-    bluetooth_structures::BluetoothDevice, BluetoothDeviceState, BluetoothStore,
+    bluetooth_structures::BluetoothDeviceProps, BluetoothDeviceState, BluetoothStore,
 };
 
 use mctk_core::{
@@ -180,7 +180,7 @@ impl Component for BluetoothScreen {
             ]
         ));
 
-        let saved_row_component = |device: BluetoothDevice| {
+        let saved_row_component = |device: BluetoothDeviceProps| {
             let mut device_state = BluetoothStore::get().device_state.get().clone();
 
             if device.connected == true {
@@ -297,7 +297,7 @@ impl Component for BluetoothScreen {
             )
         };
 
-        let available_row_component = |device: BluetoothDevice| {
+        let available_row_component = |device: BluetoothDeviceProps| {
             // let icon = get_network_icon(network.flags.clone(), Some(network.signal.clone()));
 
             node!(

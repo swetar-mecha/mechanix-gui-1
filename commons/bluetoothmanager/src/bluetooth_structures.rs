@@ -1,5 +1,8 @@
+use futures::join;
+use crate::bluetooth_device::{battery1, device1};
+
 #[derive(Debug, Clone, PartialEq)]
-pub struct BluetoothDevice {
+pub struct BluetoothDeviceProps {
     pub name: String,
     pub alias: String,
     pub address: String,
@@ -12,7 +15,7 @@ pub struct BluetoothDevice {
     pub powered: Option<bool>,
 }
 
-impl BluetoothDevice {
+impl BluetoothDeviceProps {
     pub fn from_properties(
         device_properties: &std::collections::HashMap<String, zbus::zvariant::OwnedValue>,
     ) -> Option<Self> {
@@ -26,7 +29,7 @@ impl BluetoothDevice {
             return None; // Return None if name is empty
         }
 
-        Some(BluetoothDevice {
+        Some(BluetoothDeviceProps {
             name,
             address: device_properties
                 .get("Address")
@@ -129,4 +132,57 @@ impl CentralDevice {
                 .unwrap_or_default(),
         })
     }
+}
+
+
+
+#[derive(Debug)]
+pub struct BluetoothDevice<'a> {
+	pub device: device1::Device1Proxy<'a>,
+	pub battery: Option<battery1::Battery1Proxy<'a>>,
+}
+
+impl<'a> BluetoothDevice<'a> {
+	pub async fn new<'b: 'a>(
+		connection: &zbus::Connection,
+		path: zbus::zvariant::ObjectPath<'b>,
+	) -> zbus::Result<Self> {
+		let (device, battery) = join!(
+			device1::Device1Proxy::builder(connection)
+				.path(&path)?
+				.build(),
+			battery1::Battery1Proxy::builder(connection)
+				.path(path)?
+				.build()
+		);
+
+		match (device, battery) {
+			(Ok(device), Ok(battery)) if battery.percentage().await.is_err() => Ok(Self {
+				device,
+				battery: None,
+			}),
+			(Ok(device), Ok(battery)) => Ok(Self {
+				device,
+				battery: Some(battery),
+			}),
+			(Ok(device), Err(zbus::Error::InterfaceNotFound)) => Ok(Self {
+				device,
+				battery: None,
+			}),
+			(Err(why), _) => Err(why),
+			(_, Err(why)) => Err(why),
+		}
+	}
+
+	pub async fn icon(&self) -> String {
+		self.device
+			.inner()
+			.get_property::<String>("Icon")
+			.await
+			.unwrap_or("unknown".to_owned())
+	}
+
+	pub fn path(&self) -> zbus::zvariant::OwnedObjectPath {
+		self.device.inner().path().to_owned().into()
+	}
 }

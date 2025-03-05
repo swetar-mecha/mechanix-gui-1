@@ -7,7 +7,8 @@ members = [
     # "polkit-agent",
     # "rotate-daemon",
     "commons/*",
-    # "notification"
+    # "notification",
+    "portals/*"
 ]
 
 default-members = ["launcher", "keyboard"]
@@ -59,3 +60,4 @@ const_format = "0.2.32"
 dirs = "5.0.1"
 lazy_static = "1.5.0"
 networkmanager = { path = "../commons/networkmanager"}
+bluetoothmanager = { path = "../commons/bluetoothmanager"}
