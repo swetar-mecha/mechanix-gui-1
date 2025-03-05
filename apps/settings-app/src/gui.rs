@@ -3,8 +3,8 @@ use crate::{
         about::about_device::AboutDevice,
         battery::battery_screen::{BatteryScreen, BatteryScreenRoute},
         bluetooth::{
-            bluetooth_pairing_enter_code::BluetoothPairingEnterCode,
-            bluetooth_screen::BluetoothScreen,
+            bluetooth_screen::BluetoothScreen, bluetooth_settings::BluetoothSettings,
+            rename_central_device::RenameCentralDevice,
         },
         display::display_screen::{DisplayScreen, DisplayScreenRoute},
         network::{
@@ -53,16 +53,25 @@ pub enum NetworkScreenRoutes {
 }
 
 #[derive(Default, Debug, Clone)]
+pub enum BluetoothScreenRoutes {
+    // add bt screens here
+    #[default]
+    BluetoothScreen,
+    CentralDeviceScreen,
+    BluetoothSettings, // BluetoothPairingEnterCode,
+                       // BluetoothPairingVerifyCode,
+}
+
+#[derive(Default, Debug, Clone)]
 pub enum Routes {
     #[default]
     SettingsList,
     Network {
         screen: NetworkScreenRoutes,
     },
-    BluetoothScreen,
-    BluetoothPairingVerifyCode,
-    BluetoothPairingEnterCode,
-    BluetoothDeviceInfo,
+    Bluetooth {
+        screen: BluetoothScreenRoutes,
+    },
     DisplayScreen,
     AppearanceScreen,
     BatteryScreen,
@@ -163,10 +172,17 @@ impl Component for SettingsApp {
             Routes::DisplayScreen => base = base.push(node!(DisplayScreen::new())),
             Routes::BatteryScreen => base = base.push(node!(BatteryScreen::new())),
             Routes::AboutScreen => base = base.push(node!(AboutDevice {})),
-            Routes::BluetoothScreen => base = base.push(node!(BluetoothScreen {})),
-            Routes::BluetoothPairingEnterCode => {
-                base = base.push(node!(BluetoothPairingEnterCode {}))
-            }
+            Routes::Bluetooth { screen } => match screen {
+                BluetoothScreenRoutes::BluetoothScreen => {
+                    base = base.push(node!(BluetoothScreen::new()))
+                }
+                BluetoothScreenRoutes::CentralDeviceScreen => {
+                    base = base.push(node!(RenameCentralDevice::new()))
+                }
+                BluetoothScreenRoutes::BluetoothSettings => {
+                    base = base.push(node!(BluetoothSettings::new()))
+                }
+            },
             _ => (),
         }
 

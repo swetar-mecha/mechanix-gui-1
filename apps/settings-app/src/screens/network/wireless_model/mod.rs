@@ -361,6 +361,8 @@ impl WirelessModel {
 
     fn stream_known_networks() {
         RUNTIME.spawn(async {
+            println!("RUNNING stream_known_networks--------------->>");
+
             let connection = zbus::Connection::system().await.unwrap();
             let proxy = settings::SettingsProxy::new(&connection).await.unwrap();
             let mut stream = proxy.receive_connections_changed().await;
@@ -410,6 +412,7 @@ impl WirelessModel {
 
     fn stream_scan_result() {
         RUNTIME.spawn(async {
+            println!("RUNNING stream_scan_result----------------");
             let connection = zbus::Connection::system().await.unwrap();
             let wireless_proxy = wireless_device::WirelessDeviceProxy::new(
                 &connection,
@@ -507,7 +510,7 @@ impl WirelessModel {
                     })
                 }
 
-                println!("IN STREAMM {:?} ", connected_network);
+                println!("IN STREAMM stream_connection {:?} ", connected_network);
 
                 WirelessModel::get()
                     .connected_network

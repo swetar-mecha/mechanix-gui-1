@@ -10,11 +10,11 @@ use mctk_core::{
 };
 
 use super::component::SettingsRowComponent;
-use crate::header_node;
 use crate::{
-    components::*, screens::network::wireless_model::WirelessModel,
+    components::*, gui::BluetoothScreenRoutes, screens::network::wireless_model::WirelessModel,
     shared::style_constants::DISABLED_TEXT, utils::truncate,
 };
+use crate::{gui, header_node};
 use crate::{
     gui::{Message, NetworkScreenRoutes, Routes},
     screens::battery::battery_model::BatteryModel,
@@ -102,9 +102,10 @@ impl Component for SettingsScreen {
             icon_1_type: IconType::Svg,
             icon_2: "grey_right_arrow".to_string(),
             color: DISABLED_TEXT.to_owned(),
-            // on_click: None,
             on_click: Some(Box::new(move || msg!(Message::ChangeRoute {
-                route: Routes::BluetoothScreen
+                route: Routes::Bluetooth {
+                    screen: BluetoothScreenRoutes::BluetoothScreen
+                }
             }))),
         },);
         let bluetooth_div = node!(
@@ -353,7 +354,7 @@ impl Component for SettingsScreen {
         );
 
         list_items = list_items.push(network_div);
-        // list_items = list_items.push(bluetooth_div);
+        list_items = list_items.push(bluetooth_div);
         list_items = list_items.push(display_div);
         // list_items = list_items.push(appearance_div);
         list_items = list_items.push(battery_div);
