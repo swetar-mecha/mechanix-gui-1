@@ -1,22 +1,22 @@
+mod gui;
+
+use bluetoothmanager::get_device_name;
+use mctk_core::prelude::smithay_client_toolkit::shell::wlr_layer;
 use mctk_core::prelude::*;
 use mctk_core::reexports::smithay_client_toolkit::reexports::calloop::{self, channel::Event};
-use mctk_core::widgets::Text;
+use mctk_smithay::layer_shell::layer_surface::LayerOptions;
+use mctk_smithay::layer_shell::layer_window::{LayerWindow, LayerWindowParams};
 use mctk_smithay::xdg_shell::xdg_window::{XdgWindow, XdgWindowParams};
 use mctk_smithay::{WindowInfo, WindowMessage, WindowOptions};
 use smithay_client_toolkit::reexports::calloop::channel::Sender;
-use std::any::Any;
+use zbus::zvariant::ObjectPath;
 use std::collections::HashMap;
 use tokio::sync::oneshot;
 use tracing_subscriber::prelude::*;
-use zbus::zvariant::ObjectPath;
-use bluetoothmanager::BluetoothStore;
 use bluetoothmanager::bluetooth_agent::{agent1, agent_manager1};
-// use bluetoothmanager::{BluetoothStore, bluetooth_agent::agent1};
-// use bluetooth_manager::bluetooth_manager as bluez_zbus;
-// use bluez_zbus::{agent1::Agent1Proxy, agent_manager1::AgentManager1Proxy};
+use gui::App;
 
 const AGENT_PATH: &str = "/org/bluez/agent/cosmic";
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
 
@@ -39,19 +39,15 @@ async fn main() -> anyhow::Result<()> {
         .with_filter(tracing_subscriber::filter::filter_fn(move |metadata| {
             metadata.level() <= &log_level
         }));
- 
+
     tracing_subscriber::registry().with(log_filter).init();
-    println!("Hello, bluetooth world! {:?}", BluetoothStore::get().is_enabled.get());
 
     let system_conn = zbus::Connection::system().await.unwrap();
     let (agent, mut receiver) = agent1::create();
-
-    let system_conn = zbus::Connection::system().await?;
     let agent_path = ObjectPath::from_static_str_unchecked(AGENT_PATH);
     tracing::debug!("connecting agent");
-   
+
     system_conn.object_server().at(&agent_path, agent).await?;
-    tracing::debug!("connecting to bluez agent manager");
 
     tracing::debug!("connecting to bluez agent manager");
 
@@ -62,11 +58,13 @@ async fn main() -> anyhow::Result<()> {
     bluez
         .register_agent(
             &agent_path,
-            <&'static str>::from(agent1::Capability::DisplayYesNo),
+            <&'static str>::from(agent1::Capability::DisplayYesNo),   // DEFAULT
+            // <&'static str>::from(agent1::Capability::KeyboardDisplay),
         )
         .await?;
 
     if let Err(why) = bluez.request_default_agent(&agent_path).await {
+        println!("ERROR OCCURED==============> {:?}", why.clone());
         _ = bluez.unregister_agent(&agent_path).await;
         Err(why)?;
     }
@@ -78,6 +76,7 @@ async fn main() -> anyhow::Result<()> {
 
         match msg {
             agent1::Message::RequestAuthorization { device, response } => {
+               println!("RequestAuthorization=========");
                 _ = response.send(true);
             }
             agent1::Message::RequestConfirmation {
@@ -85,28 +84,57 @@ async fn main() -> anyhow::Result<()> {
                 passkey,
                 response,
             } => {
+                println!("RequestConfirmation=========");
+
                 let (agent_tx, agent_rx) = oneshot::channel();
                 let connection = zbus::Connection::system().await?;
-                let device = BluetoothStore::get_device(&connection, device).await.unwrap();
-                let _ = launch_ui(Some(agent_tx), device.device.name().await.unwrap(), passkey.to_string());
+                let device_name = get_device_name(&connection, device).await;
+                let _ = launch_ui(Some(agent_tx), device_name.clone(), passkey.to_string());
                 let res = agent_rx.await.unwrap();
+            
+                println!("23. agent1::Message::RequestConfirmation-RES------> {:?}", res.to_owned());
+                // if res.to_owned() == true {
+                //     bluetoothmanager::BluetoothStore::stream_bluetooth_devices();
+                // }
                 _ = response.send(res);
             }
             agent1::Message::RequestPasskey { device, response } => {
-                _ = response.send(None);
+                _ = 
+                println!("RequestPasskey-------");
+
+                response.send(None);
             }
             agent1::Message::RequestPinCode { device, response } => {
-                _ = response.send(None);
+                _ =
+                println!("RequestPinCode-------");
+                // get pin code
+                // DEBUG  message received, msg: RequestPinCode { device: OwnedObjectPath(ObjectPath("/org/bluez/hci0/dev_10_08_C1_C6_B7_79")), response: Sender { inner: Some(Inner { state: State { is_complete: false, is_closed: false, is_rx_task_set: true, is_tx_task_set: false } }) } }
+
+                // linux -> connected direct
+                // car device -> request pin - enter pin dialogue 
+                
+                 response.send(Some("123456".to_string()));
             }
-            agent1::Message::AuthorizeService { device, uuid } => {}
+            agent1::Message::AuthorizeService { device, uuid } => {
+                println!("AuthorizeService-------");
+            }
             agent1::Message::Cancel => {}
             agent1::Message::DisplayPasskey {
                 device,
                 passkey,
                 entered,
-            } => {}
-            agent1::Message::DisplayPinCode { device, pincode } => {}
-            agent1::Message::Release => {}
+            } => {
+                println!("DisplayPasskey-------");
+
+            }
+            agent1::Message::DisplayPinCode { device, pincode } => {
+                println!("DisplayPinCode-------");
+
+            }
+            agent1::Message::Release => {
+                println!("Release-------");
+
+            }
         }
     }
 
@@ -138,109 +166,6 @@ pub struct AppState {
     passkey: String,
 }
 
-#[derive(Debug, Clone)]
-enum Message {
-    Confirm,
-    Cancel
-}
-
-#[component(State = "AppState")]
-#[derive(Debug, Default)]
-pub struct App {}
-
-#[state_component_impl(AppState)]
-impl Component for App {
-    fn init(&mut self) {
-        self.state = Some(AppState {
-            app_channel: None,
-            device_name: "".to_string(),
-            passkey: "".to_string(),
-        })
-    }
-
-    fn view(&self) -> Option<Node> {
-        let device_name = self.state_ref().device_name.clone();
-        let passkey = self.state_ref().passkey.clone();
-        let message = format!("{:?} would like to pair, confirm code", device_name);
-
-        Some(
-            node!(
-                Div::new().bg(Color::WHITE),
-                lay![
-                    size: size_pct!(100.0),
-                    direction: Direction::Column
-                ]
-            )
-            .push(node!(
-                Div::new().bg(Color::YELLOW),
-                lay![
-                    size_pct:[100, 85],
-                        axis_alignment: Alignment::Center,
-                        cross_alignment: Alignment::Center
-                ]
-            )
-            .push(node!(Text::new(txt!(message)).style("font_size", 24.), lay![size: [Auto, 35.], margin: [0., 0., 20., 0.]]))
-            .push(node!(Text::new(txt!(passkey)).style("font_size", 40.), lay![size: [Auto, 65.]])))
-            .push(
-                node!(
-                    Div::new().bg(Color::RED),
-                    lay![size_pct:[100, 15], 
-                    direction: Direction::Row]
-                )
-                .push(node!(
-                    Button::new(txt!("Confirm"))
-                        .on_click(Box::new(|| msg!(Message::Confirm)))
-                        .style("color", Color::rgb(255., 0., 0.))
-                        .style("background_color", Color::BLUE)
-                        .style("active_color", Color::rgb(200., 200., 200.))
-                        .style("font_size", 18.0),
-                    lay![size_pct: [50, 100]]
-                ))
-                .push(node!(
-                    Button::new(txt!("Cancel"))
-                        .on_click(Box::new(|| msg!(Message::Cancel)))
-                        .style("color", Color::rgb(255., 0., 0.))
-                        .style("background_color", Color::LIGHT_GREY)
-                        .style("active_color", Color::rgb(200., 200., 200.))
-                        .style("font_size", 18.0),
-                    lay![size_pct: [50, 100]]
-                )),
-            ),
-        )
-    }
-
-    fn update(
-        &mut self,
-        message: mctk_core::component::Message,
-    ) -> Vec<mctk_core::component::Message> {
-        println!("App has sent: {:?}", message.downcast_ref::<Message>());
-        match message.downcast_ref::<Message>() {
-            Some(Message::Confirm) => {
-                if let Some(app_channel) = self.state_ref().app_channel.clone() {
-                    let _ = app_channel.send(AppMessage::ConfirmPasskey);
-                }
-            }
-            Some(Message::Cancel) => {
-                if let Some(app_channel) = self.state_ref().app_channel.clone() {
-                    let _ = app_channel.send(AppMessage::ConfirmPasskey);
-                }
-            }
-            _ => (),
-        }
-        vec![]
-    }
-}
-
-impl RootComponent<AppParams> for App {
-    fn root(&mut self, w: &dyn std::any::Any, app_params: &dyn Any) {
-        println!("root initialized");
-        let app_params = app_params.downcast_ref::<AppParams>().unwrap();
-        self.state_mut().app_channel = app_params.app_channel.clone();
-        self.state_mut().device_name = app_params.device_name.clone();
-        self.state_mut().passkey = app_params.passkey.clone();
-    }
-}
-
 fn launch_ui(mut agent_tx: Option<oneshot::Sender<bool>>, device_name: String, passkey: String) -> anyhow::Result<()> {
     // let env_filter = EnvFilter::try_from_default_env().unwrap_or(EnvFilter::new("debug"));
     // tracing_subscriber::fmt()
@@ -266,15 +191,46 @@ fn launch_ui(mut agent_tx: Option<oneshot::Sender<bool>>, device_name: String, p
         title: "mechanix-dialog".to_string(),
         namespace: "mechanix-dialog".to_string(),
     };
+    // let settings = match settings::read_settings_yml() {
+    //     Ok(settings) => settings,
+    //     Err(e) => {
+    //         println!("error while reading settings {:?}", e);
+    //         KeyboardSettings::default()
+    //     }
+    // };
 
+
+    // let layouts = settings.layouts.clone();
+
+    // let app_id = settings
+    // .app
+    // .id
+    // .clone()
+    // .unwrap_or(String::from("mechanix.shell.portals.bluetooth"));
+    // let namespace = app_id.clone();
+    let namespace = String::from("mechanix.shell.portals.bluetooth");
+
+    let mut layer_shell_opts = LayerOptions {
+        anchor: wlr_layer::Anchor::RIGHT | wlr_layer::Anchor::BOTTOM,
+        layer: wlr_layer::Layer::Top,
+        keyboard_interactivity: wlr_layer::KeyboardInteractivity::None,
+        namespace: Some(namespace.clone()),
+        zone: 0 as i32,
+    };
+    
     let (app_channel_tx, app_channel_rx) = calloop::channel::channel();
-    let (mut app, mut event_loop, window_tx) = XdgWindow::open_blocking::<App, AppParams>(
-        XdgWindowParams {
+    let (layer_tx, layer_rx) = calloop::channel::channel();
+
+    let (mut app, mut event_loop, window_tx) = LayerWindow::open_blocking::<App, AppParams>(
+        LayerWindowParams {
             window_info,
             window_opts,
             fonts,
             assets,
+            layer_shell_opts: layer_shell_opts.clone(),
             svgs,
+            layer_tx: Some(layer_tx.clone()),
+            layer_rx: Some(layer_rx),
             ..Default::default()
         },
         AppParams {

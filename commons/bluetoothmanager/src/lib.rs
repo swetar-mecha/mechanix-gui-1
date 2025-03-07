@@ -55,8 +55,6 @@ lazy_static! {
     };
 }
 
-const AGENT_PATH: &str = "/org/bluez/agent/cosmic";
-
 #[derive(Model)]
 pub struct BluetoothStore {
     pub is_enabled: Context<bool>,
@@ -136,11 +134,7 @@ impl BluetoothStore {
             let mut connected_devices: Vec<BluetoothDeviceProps> = vec![];
 
             for (object_path, interfaces) in managed_objects.iter() {
-                // for (interface, properties) in interfaces.iter() {
-                //     println!("CHECK -----------> interface {:?} ", interface);
-                // }
-                // println!(" =====> object_path: {:?}", object_path);
-
+           
                 if let Some(device_properties) = interfaces.get("org.bluez.Device1") {
                     if let Some(device) = BluetoothDeviceProps::from_properties(device_properties) {
                         //     true => saved_devices.push(device),
@@ -189,7 +183,7 @@ impl BluetoothStore {
 
             proxy.start_discovery().await.unwrap();
             println!("discovery started...");
-            thread::sleep(Duration::from_secs(10));
+            thread::sleep(Duration::from_secs(8));
 
             BluetoothStore::get_managed_objects();
 
@@ -365,13 +359,6 @@ impl BluetoothStore {
 
 
 
-    pub async fn get_device<'a>(
-        connection: &zbus::Connection,
-        device_path: zbus::zvariant::OwnedObjectPath,
-    ) -> zbus::Result<BluetoothDevice<'a>> {
-        BluetoothDevice::new(connection, device_path.into()).await
-    }
-
     pub fn start_streaming() {
         let check = BluetoothStore::get().is_streaming.get().clone();
         println!("start_streaming CHECK : {:?}", check);
@@ -385,4 +372,25 @@ impl BluetoothStore {
         Self::stream_bluetooth_devices();
         // }
     }
+}
+
+
+pub async fn get_device_name<'a>(
+    connection: &zbus::Connection,
+    device_path: zbus::zvariant::OwnedObjectPath,
+) -> String {
+
+    let device_path =
+    ObjectPath::try_from(device_path.as_str()).expect("Invalid object path");
+
+    let device_proxy_builder = Device1Proxy::builder(&connection)
+    .destination("org.bluez")
+    .unwrap()
+    .path(&device_path)
+    .unwrap()
+    .interface("org.bluez.Device1");
+
+    let device_proxy = device_proxy_builder.unwrap().build().await.unwrap();
+    let name : String = device_proxy.name().await.unwrap();
+    name
 }
