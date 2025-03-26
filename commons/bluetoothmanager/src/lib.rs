@@ -52,6 +52,7 @@ lazy_static! {
         central_device: Context::new(None),
         central_device_name: Context::new("".to_string()),
         central_device_alias: Context::new("".to_string()),
+        portal_confirmation: Context::new(false),
     };
 }
 
@@ -66,6 +67,7 @@ pub struct BluetoothStore {
     pub central_device: Context<Option<CentralDevice>>,
     pub central_device_name: Context<String>,
     pub central_device_alias: Context<String>,
+    pub portal_confirmation: Context<bool>,
 }
 
 impl BluetoothStore {
@@ -120,7 +122,7 @@ impl BluetoothStore {
         });
     }
 
-    pub fn get_managed_objects() {
+    pub async fn get_managed_objects() {
         RUNTIME.spawn(async move {
             println!("get_managed_objects called....");
 
@@ -140,6 +142,7 @@ impl BluetoothStore {
                         //     true => saved_devices.push(device),
                         //     false => available_devices.push(device),
                         // }
+                        println!("CHECKING Device : {:?} ", device.clone());
 
                         match device.connected {
                             true => connected_devices.push(device),
@@ -183,11 +186,16 @@ impl BluetoothStore {
 
             proxy.start_discovery().await.unwrap();
             println!("discovery started...");
-            thread::sleep(Duration::from_secs(8));
+            thread::sleep(Duration::from_secs(7));
 
-            BluetoothStore::get_managed_objects();
+            BluetoothStore::get_managed_objects().await;
 
             proxy.stop_discovery().await.unwrap();
+
+            let portal_action = BluetoothStore::get().portal_confirmation.get().clone();
+            if portal_action == true {
+                BluetoothStore::get().portal_confirmation.set(false);
+            }
             println!("discovery stopped...");
         });
     }
@@ -357,8 +365,6 @@ impl BluetoothStore {
         });
     }
 
-
-
     pub fn start_streaming() {
         let check = BluetoothStore::get().is_streaming.get().clone();
         println!("start_streaming CHECK : {:?}", check);
@@ -366,7 +372,7 @@ impl BluetoothStore {
             return;
         }
         BluetoothStore::get().is_streaming.set(true);
-        Self::get_managed_objects();
+        // Self::get_managed_objects();
         Self::stream_bluetooth_enabled_status();
         // if BluetoothStore::get().is_enabled.get().clone() {
         Self::stream_bluetooth_devices();
@@ -394,3 +400,5 @@ pub async fn get_device_name<'a>(
     let name : String = device_proxy.name().await.unwrap();
     name
 }
+
+

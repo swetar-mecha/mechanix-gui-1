@@ -9,7 +9,8 @@ use crate::{AppMessage, AppParams, AppState};
 #[derive(Debug, Clone)]
 pub enum Message {
     Confirm,
-    Cancel
+    Cancel,
+    UpdatePasskey(String),
 }
 
 #[component(State = "AppState")]
@@ -23,15 +24,24 @@ impl Component for App {
             app_channel: None,
             device_name: "".to_string(),
             passkey: "".to_string(),
+            enter_passkey: false,
         })
     }
 
     fn view(&self) -> Option<Node> {
+
         let device_name = self.state_ref().device_name.clone();
         let passkey = self.state_ref().passkey.clone();
-        let text_line_1 = format!("Please confirm if the PIN matches");
-        let text_line_2 = format!("the one disaplayed on {:?}", device_name);
+        let enter_passkey : bool = self.state_ref().enter_passkey.clone();
+        println!("CHECK App view initialized : {:?}", self.state_ref().enter_passkey.clone());
 
+        let mut text_line_1 = format!("Please confirm if the PIN matches");
+        let mut text_line_2 = format!("the one disaplayed on {:?}", device_name);
+
+        if enter_passkey == true {
+            text_line_1 = format!("Please confirm the PIN that was entered");
+            text_line_2 = format!("the one disaplayed on {:?}", device_name);
+        }
 
         let mut main_node =  node!(
             Div::new().bg(Color::TRANSPARENT),
@@ -40,6 +50,39 @@ impl Component for App {
                     direction: Direction::Column
                 ]
             );
+
+        let pin_node = if enter_passkey == false {
+            node!(
+                Text::new(txt!(passkey))
+                .style("color", Color::rgba(255., 255., 255., 1.))
+                .style("font", "Inter")
+                .with_class("text-xl leading-7 font-bold"),
+                lay![
+                    size: [Auto, 65.],
+                ])
+        } else {
+            node!(
+                // TextBox::new(Some("".to_string()))
+                //     .with_class("text-md border-1 bg-transparent")
+                //     .placeholder("Enter Pin")
+                //     .on_change(Box::new(|s| msg!(Message::UpdatePasskey(s.to_string())))),
+                // lay![
+                //     size_pct: [80, 60],
+                //     margin: [0., 0., 10., 0.]
+                // ]
+
+                TextBox::new(Some("".to_string()))
+                .with_class("text-md border-1 bg-transparent")
+                .placeholder("Enter Pin")
+                .on_change(Box::new(|s| msg!( 
+                    Message::UpdatePasskey(s.to_string())
+                ))),
+                lay![
+                    size: [410, 40],
+                    margin: [0., 0., 8., 0.]
+                ]
+            )
+        };
 
         let modal = node!(
             Div::new().bg(Color::rgba(29., 29., 29., 1.)).border(
@@ -119,15 +162,7 @@ impl Component for App {
                     axis_alignment: Alignment::Center
                 ]
             )
-            .push(node!(
-                Text::new(txt!(passkey))
-                .style("color", Color::rgba(255., 255., 255., 1.))
-                .style("font", "Inter")
-                .with_class("text-xl leading-7 font-bold"),
-                lay![
-                    size: [Auto, 65.],
-                ]))
-            )
+            .push(pin_node))
         )
         .push(
             // BUTTONS
@@ -209,6 +244,11 @@ impl Component for App {
                     let _ = app_channel.send(AppMessage::Cancel);
                 }
             }
+            Some(Message::UpdatePasskey(passkey)) => {
+                if let Some(app_channel) = self.state_ref().app_channel.clone() {
+                    let _ = app_channel.send(AppMessage::UpdatePasskey(passkey.to_string()));
+                }
+            }
             _ => (),
         }
         vec![]
@@ -222,5 +262,6 @@ impl RootComponent<AppParams> for App {
         self.state_mut().app_channel = app_params.app_channel.clone();
         self.state_mut().device_name = app_params.device_name.clone();
         self.state_mut().passkey = app_params.passkey.clone();
+        self.state_mut().enter_passkey = app_params.enter_passkey.clone();
     }
 }

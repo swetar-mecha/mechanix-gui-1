@@ -95,6 +95,12 @@ impl Component for BluetoothScreen {
         let saved_devices = BluetoothStore::get().saved_devices.get().clone();
         let available_devices = BluetoothStore::get().available_devices.get().clone();
 
+        let portal_action = BluetoothStore::get().portal_confirmation.get().clone();
+
+        if(portal_action == true) {
+            BluetoothStore::stream_bluetooth_devices();
+        }
+
         let mut base: Node = node!(
             Div::new(),
             lay![

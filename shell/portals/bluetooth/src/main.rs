@@ -1,6 +1,6 @@
 mod gui;
 
-use bluetoothmanager::get_device_name;
+use bluetoothmanager::{get_device_name, BluetoothStore};
 use mctk_core::prelude::smithay_client_toolkit::shell::wlr_layer;
 use mctk_core::prelude::*;
 use mctk_core::reexports::smithay_client_toolkit::reexports::calloop::{self, channel::Event};
@@ -89,14 +89,40 @@ async fn main() -> anyhow::Result<()> {
                 let (agent_tx, agent_rx) = oneshot::channel();
                 let connection = zbus::Connection::system().await?;
                 let device_name = get_device_name(&connection, device).await;
-                let _ = launch_ui(Some(agent_tx), device_name.clone(), passkey.to_string());
+                println!("RequestConfirmation====About to LauchUiParams=====");
+
+                let _ = launch_ui(LauchUiParams {
+                    agent_tx: Some(agent_tx), 
+                    passkey_agent_tx: None,
+                    enter_passkey: false, 
+                    device_name: device_name.clone(),
+                    passkey: passkey.to_string() 
+                });
                 let res = agent_rx.await.unwrap();
             
                 println!("23. agent1::Message::RequestConfirmation-RES------> {:?}", res.to_owned());
-                // if res.to_owned() == true {
-                //     bluetoothmanager::BluetoothStore::stream_bluetooth_devices();
-                // }
                 _ = response.send(res);
+
+                if res.to_owned() == true {
+                    BluetoothStore::get().portal_confirmation.set(true);
+                }
+
+
+                // // TEMP ----TO check entering passkey scenario----
+                // let (agent_tx, agent_rx) = oneshot::channel();
+                // let (passkey_agent_tx, passkey_agent_rx) = oneshot::channel();
+                // let connection = zbus::Connection::system().await?;
+                // let device_name = get_device_name(&connection, device).await;
+                // let _ = launch_ui(LauchUiParams {
+                //     agent_tx: Some(agent_tx), 
+                //     passkey_agent_tx: Some(passkey_agent_tx),
+                //     enter_passkey: true, 
+                //     device_name: device_name.clone(),
+                //     passkey: "".to_string() 
+                // });
+                // let res = passkey_agent_rx.await.unwrap();
+                // println!("24. CHECKKKK agent1::Message::RequestPinCode-RES------> {:?}", res.to_owned());  // check this
+                // _ = response.send(true); // real- send passkey string 
             }
             agent1::Message::RequestPasskey { device, response } => {
                 _ = 
@@ -107,13 +133,28 @@ async fn main() -> anyhow::Result<()> {
             agent1::Message::RequestPinCode { device, response } => {
                 _ =
                 println!("RequestPinCode-------");
-                // get pin code
-                // DEBUG  message received, msg: RequestPinCode { device: OwnedObjectPath(ObjectPath("/org/bluez/hci0/dev_10_08_C1_C6_B7_79")), response: Sender { inner: Some(Inner { state: State { is_complete: false, is_closed: false, is_rx_task_set: true, is_tx_task_set: false } }) } }
+                // // get pin code
+                // // DEBUG  message received, msg: RequestPinCode { device: OwnedObjectPath(ObjectPath("/org/bluez/hci0/dev_10_08_C1_C6_B7_79")), response: Sender { inner: Some(Inner { state: State { is_complete: false, is_closed: false, is_rx_task_set: true, is_tx_task_set: false } }) } }
+                // // linux -> connected direct
+                // // car device -> request pin - enter pin dialogue 
 
-                // linux -> connected direct
-                // car device -> request pin - enter pin dialogue 
-                
-                 response.send(Some("123456".to_string()));
+                let (passkey_agent_tx, passkey_agent_rx) = oneshot::channel();
+
+                let connection = zbus::Connection::system().await?;
+                let device_name = get_device_name(&connection, device).await;
+                let _ = launch_ui(LauchUiParams {
+                    agent_tx: None, 
+                    passkey_agent_tx: Some(passkey_agent_tx),
+                    enter_passkey: true, 
+                    device_name: device_name.clone(),
+                    passkey: "".to_string() 
+                });
+
+                let res = passkey_agent_rx.await.unwrap();
+            
+                println!("24. CHECKKKK agent1::Message::RequestPinCode-RES------> {:?}", res.to_owned());  // check this
+
+                _ = response.send(Some("123456".to_string()));  // TODO: send pin entered by user here
             }
             agent1::Message::AuthorizeService { device, uuid } => {
                 println!("AuthorizeService-------");
@@ -150,6 +191,7 @@ async fn main() -> anyhow::Result<()> {
 pub enum AppMessage {
     ConfirmPasskey,
     Cancel,
+    UpdatePasskey(String),
 }
 
 #[derive(Debug, Clone)]
@@ -157,16 +199,38 @@ pub struct AppParams {
     app_channel: Option<calloop::channel::Sender<AppMessage>>,
     device_name: String,
     passkey: String,
+    enter_passkey: bool,
 }
 
 #[derive(Debug, Default)]
 pub struct AppState {
     app_channel: Option<Sender<AppMessage>>,
+    enter_passkey: bool,
     device_name: String,
     passkey: String,
 }
 
-fn launch_ui(mut agent_tx: Option<oneshot::Sender<bool>>, device_name: String, passkey: String) -> anyhow::Result<()> {
+struct LauchUiParams {
+    agent_tx: Option<oneshot::Sender<bool>>,
+    passkey_agent_tx: Option<oneshot::Sender<String>>,
+    enter_passkey: bool,
+    device_name: String,
+    passkey: String,
+}
+
+// fn launch_ui(mut agent_tx: Option<oneshot::Sender<bool>>, enter_passkey: bool,device_name: String, passkey: String) -> anyhow::Result<()> {
+fn launch_ui(mut ui_params: LauchUiParams) -> anyhow::Result<()> {
+
+    let LauchUiParams {
+        mut agent_tx,
+        mut passkey_agent_tx,
+        enter_passkey,
+        device_name,
+        passkey,
+    } = ui_params;
+
+    println!("IN launch_ui enter_passkey : {:?} ", enter_passkey.clone());
+
     // let env_filter = EnvFilter::try_from_default_env().unwrap_or(EnvFilter::new("debug"));
     // tracing_subscriber::fmt()
     //     .compact()
@@ -237,6 +301,7 @@ fn launch_ui(mut agent_tx: Option<oneshot::Sender<bool>>, device_name: String, p
             app_channel: Some(app_channel_tx.clone()),
             device_name,
             passkey,
+            enter_passkey
         },
     );
     let handle = event_loop.handle();
@@ -252,6 +317,11 @@ fn launch_ui(mut agent_tx: Option<oneshot::Sender<bool>>, device_name: String, p
                 AppMessage::ConfirmPasskey => {
                     let _ = agent_tx.take().unwrap().send(true);
                     exit(window_tx_2.clone());
+                }
+                AppMessage::UpdatePasskey(passkey) => {
+                    let _ = passkey_agent_tx.take().unwrap().send(passkey);
+                    exit(window_tx_2.clone());
+
                 }
             },
             calloop::channel::Event::Closed => {
