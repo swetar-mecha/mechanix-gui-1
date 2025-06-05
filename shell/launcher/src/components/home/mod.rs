@@ -61,6 +61,8 @@ fn setup_view_root(mut commands: Commands,  image_assets: Res<ImageAssets>, font
     let HomeScreenSettings {
         width,
         height,
+        grid_template_columns,
+        grid_template_rows,
         pinned_apps,
         widgets,
     } = home;
@@ -77,8 +79,8 @@ fn setup_view_root(mut commands: Commands,  image_assets: Res<ImageAssets>, font
                 width: Val::Vw(width),
                 height: Val::Vh(height),
                 display: Display::Grid,
-                grid_template_columns: RepeatedGridTrack::flex(4, 1.0),
-                grid_template_rows: RepeatedGridTrack::flex(4, 1.0),
+                grid_template_columns: RepeatedGridTrack::flex(grid_template_columns, 1.0),
+                grid_template_rows: RepeatedGridTrack::flex(grid_template_rows, 1.0),
                 padding: ROOT_PADDING,
                 row_gap: ROW_GAP,
                 column_gap: COLUMN_GAP,
@@ -88,7 +90,7 @@ fn setup_view_root(mut commands: Commands,  image_assets: Res<ImageAssets>, font
         .with_children(
             |parent: &mut bevy::ecs::relationship::RelatedSpawnerCommands<'_, ChildOf>| {
                 for control_name in pinned_apps.clone() {
-                    spawn_menu_widget(parent, &image_assets, &font_assets, control_name.as_str());
+                    spawn_menu_widget(parent, &image_assets, control_name.name.as_str());
                 }
             },
         );
@@ -97,33 +99,10 @@ fn setup_view_root(mut commands: Commands,  image_assets: Res<ImageAssets>, font
 fn spawn_menu_widget(
     parent: &mut bevy::ecs::relationship::RelatedSpawnerCommands<'_, ChildOf>,
     image_assets: &ImageAssets,
-    font_assets: &FontAssets,
     control_name: &str,
 ) {
-    let FontAssets { font_icons, .. } = font_assets;
-
-    let icon = match control_name {
-        "App 1" => Icon::Terminal,
-        "App 2" => Icon::Folder,
-        "App 3" => Icon::FileManager,
-        "App 4" => Icon::App,
-        "App 5" => Icon::App,
-        "App 6" => Icon::App,
-        "App 7" => Icon::App,
-        "App 8" => Icon::App,
-        "App 9" => Icon::App,
-        "App 10" => Icon::App,
-        "App 11" => Icon::App,
-        "App 12" => Icon::App,
-        "App 13" => Icon::App,
-        "App 14" => Icon::Moon,
-        "App 15" => Icon::Moon,
-        "App 16" => Icon::Moon,
-        _ => Icon::Moon,
-    };
-
-    
-
+   
+   // kept for widget 
    let (grid_column, grid_row) = if control_name == "App 23"  {
         (GridPlacement::span(2), GridPlacement::span(2))
     } else {
@@ -132,7 +111,7 @@ fn spawn_menu_widget(
 
     parent.spawn((
         Node {
-            display: Display::Grid,
+            display: Display::Grid, 
             grid_column: grid_column,
             padding: UiRect::all(Val::Px(4.0)),
             align_items: AlignItems::Center,
