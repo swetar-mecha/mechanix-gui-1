@@ -116,7 +116,8 @@ fn button_system(
                 match actions {
                     Some(ButtonAction::Wifi) => {
                         println!("Wifi button pressed");
-                        event_writer.write(NetworkActionEvent(NetworkAction::ToggleWifi(true)));
+                        // event_writer.write(NetworkActionEvent(NetworkAction::ToggleWifi(true)));
+                        event_writer.write(NetworkActionEvent(NetworkAction::ListNetworks));
                     }
                     _ => {
                         println!("no action");

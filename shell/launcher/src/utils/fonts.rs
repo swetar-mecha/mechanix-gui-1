@@ -121,6 +121,9 @@ pub struct FontAssets {
     pub wireless_warning: Handle<Image>, // icons/wireless_warning.png
     #[asset(key = "image.extend_screen_none")]
     pub extend_screen_none: Handle<Image>, // icons/wireless_on.png
+    #[asset(key = "image.settings_icon")]
+    pub settings_icon: Handle<Image>,  // icons/settings_icon.png
+    
 
     // Texture Atlas Layouts
     #[asset(key = "layout.airplane")]
@@ -151,4 +154,6 @@ pub struct FontAssets {
     pub layout_wireless: Handle<TextureAtlasLayout>,
     #[asset(key = "layout.extend_screen")]
     pub layout_extend_screen: Handle<TextureAtlasLayout>,
+    #[asset(key = "layout.settings")]
+    pub layout_settings: Handle<TextureAtlasLayout>,
 }

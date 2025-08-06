@@ -1,8 +1,20 @@
 use bevy::{
-    asset::meta::Settings, ecs::system::SystemId, prelude::*, render::settings, scene::ron::de,
+    asset::meta::Settings,
+    color::palettes::{
+        css::{WHITE, WHITE_SMOKE},
+        tailwind::RED_500,
+    },
+    ecs::system::SystemId,
+    prelude::*,
+    reflect::List,
+    render::settings,
+    scene::ron::de,
     window::CompositeAlphaMode,
 };
-use bevy_core_widgets::CoreButton;
+use bevy_core_widgets::{CoreButton, CoreScrollArea};
+use bevy_plugins::network_manager::{
+    ActiveNetworkStrength, NetworkAction, NetworkActionEvent, NetworkList, WirelessEnabled,
+};
 use bevy_styled_widgets::prelude::{StyledText, StyledTextPlugin, ThemeManager, ThemeMode};
 
 use crate::{
@@ -31,6 +43,15 @@ pub struct SettingsDrawerRoot;
 pub struct SettingsDrawerPopup;
 
 #[derive(Component)]
+struct HeaderNode;
+
+#[derive(Component)]
+struct ContainerNode;
+
+#[derive(Component)]
+struct WirelessEntry;
+
+#[derive(Component)]
 pub struct Wireless;
 
 #[derive(Component)]
@@ -48,8 +69,8 @@ pub struct Microphone;
 #[derive(Component)]
 pub struct ScreenRecording;
 
-#[derive(Resource, Default, Debug, Clone)]
-pub struct WirelessEnabled(pub bool);
+// #[derive(Resource, Default, Debug, Clone)]
+// pub struct WirelessEnabled(pub bool);
 
 #[derive(Resource, Default, Debug, Clone)]
 pub struct BluetoothEnabled(pub bool);
@@ -93,7 +114,7 @@ impl Plugin for SettingsDrawerPlugin {
         app.add_event::<SettingsPanelBackgroudEvent>();
 
         app.insert_state(Screens::Homescreen);
-        app.insert_resource(WirelessEnabled(true));
+        // app.insert_resource(WirelessEnabled(true));
         app.init_resource::<BluetoothEnabled>();
         app.insert_resource(RotationEnabled(true));
         app.insert_resource(AirplaneModeEnabled(true));
@@ -135,6 +156,9 @@ impl Plugin for SettingsDrawerPlugin {
             (
                 update_wireless_state
                     .run_if(resource_changed::<WirelessEnabled>)
+                    .run_if(resource_exists::<FontAssets>),
+                update_wireless_list_state
+                    .run_if(resource_changed::<NetworkList>)
                     .run_if(resource_exists::<FontAssets>),
                 update_airplane_mode_state
                     .run_if(resource_changed::<AirplaneModeEnabled>)
@@ -212,6 +236,52 @@ fn update_wireless_state(
             styled_button.active = Some(false);
             styled_button.icon = Some(font_assets.wireless_off.clone());
             styled_button.layout = Some(font_assets.layout_wireless.clone());
+        }
+    }
+}
+
+fn update_wireless_list_state(
+    mut commands: Commands,
+    network_list: Res<NetworkList>,
+    container_query: Query<Entity, With<ContainerNode>>,
+    children_query: Query<&Children>,
+    ui_node_query: Query<Entity, With<Node>>,
+    font_assets: Res<FontAssets>,
+) {
+    if network_list.is_changed() {
+        if let Ok(container_entity) = container_query.single() {
+            // First, remove existing UI elements inside the container
+            if let Ok(children) = children_query.get(container_entity) {
+                for child in children.iter() {
+                    if ui_node_query.contains(child) {
+                        commands.entity(child).despawn();
+                    }
+                }
+            }
+
+            let on_click = commands.register_system(
+                |mut commands: Commands, q_search: Query<Entity, With<WirelessEntry>>| {
+                    println!("Wireless entry clicked");
+                },
+            );
+
+            // Now populate the container with the new wireless entries
+            for (i, network) in network_list.0.iter().enumerate() {
+                commands.entity(container_entity).with_children(|parent| {
+                    parent.spawn(wireless(
+                        &network.ssid,
+                        network.is_active,
+                        network.signal_strength,
+                        &font_assets,
+                        on_click,
+                    ));
+
+                    // parent.spawn(divider());
+                    if i != network_list.0.len() - 1 {
+                        parent.spawn(divider());
+                    }
+                });
+            }
         }
     }
 }
@@ -404,11 +474,14 @@ fn toggle_wireless(mut enabled: ResMut<WirelessEnabled>) {
 fn long_press_wireless(
     mut commands: Commands,
     mut q_settings_drawer: Query<Entity, With<SettingsDrawerRoot>>,
+    mut event_writer: EventWriter<NetworkActionEvent>,
+    font_assets: Option<Res<FontAssets>>,
 ) {
     println!("long press wireless");
+    event_writer.write(NetworkActionEvent(NetworkAction::ListNetworks));
     for entity in q_settings_drawer.iter_mut() {
         let popup_id = commands.spawn_empty().id();
-        let popup = wireless_list_popup(&mut commands);
+        let popup = wireless_list_popup(&mut commands, font_assets.as_ref().unwrap());
         commands.entity(popup_id).insert(popup);
         commands.entity(entity).add_child(popup_id);
     }
@@ -575,6 +648,8 @@ fn on_animation_background_completed(
                     layout_terminal,
                     layout_wireless,
                     layout_extend_screen,
+                    settings_icon,
+                    layout_settings,
                     ..
                 } = &**font_assets.as_ref().unwrap();
 
@@ -1056,8 +1131,13 @@ fn popup_click(
     }
 }
 
-pub fn wireless_list_popup(commands: &mut Commands) -> impl Bundle {
+pub fn wireless_list_popup(commands: &mut Commands, font_assets: &FontAssets) -> impl Bundle {
     let on_popup_click = commands.register_system(popup_click);
+    let FontAssets {
+        settings_icon,
+        layout_settings,
+        ..
+    } = font_assets.clone();
 
     (
         Node {
@@ -1091,7 +1171,7 @@ pub fn wireless_list_popup(commands: &mut Commands) -> impl Bundle {
                 (
                     Node {
                         width: Val::Percent(100.0),
-                        height: Val::Px(80.0),
+                        height: Val::Percent(20.0),
                         justify_content: JustifyContent::SpaceBetween,
                         padding: UiRect::horizontal(Val::Px(24.)),
                         align_items: AlignItems::Center,
@@ -1105,21 +1185,23 @@ pub fn wireless_list_popup(commands: &mut Commands) -> impl Bundle {
                     },
                     BackgroundColor(Color::oklch(0.4313, 0., 0.)),
                     children![
-                        (StyledText::new("Wireless")),
-                        (bevy_styled_widgets::prelude::StyledButton::builder()
-                            .icon(Icon::Settings)
-                            .text_color(Color::WHITE)
-                            .size(bevy_styled_widgets::prelude::ButtonSize::Small)
-                            .background_color(Color::oklcha(0.2221, 0., 0., 0.90))
-                            .build(),)
+                        HeaderNode,
+                        StyledText::new("Wi-Fi"),
+                        ImageNode::from_atlas_image(
+                            settings_icon.clone(),
+                            TextureAtlas::from(layout_settings.clone()),
+                        ),
                     ]
                 ),
                 (
                     Node {
-                        width: Val::Percent(100.0),
+                        width: Val::Percent(100.),
+                        // height: Val::Percent(80.),
+                        height: Val::Px(266.),
                         display: Display::Flex,
                         flex_direction: FlexDirection::Column,
-                        align_self: AlignSelf::Stretch,
+                        row_gap: Val::Px(4.),
+                        overflow: Overflow::scroll_y(),
                         padding: UiRect {
                             left: Val::Px(24.),
                             right: Val::Px(24.),
@@ -1128,6 +1210,12 @@ pub fn wireless_list_popup(commands: &mut Commands) -> impl Bundle {
                         },
                         ..default()
                     },
+                    CoreScrollArea,
+                    ScrollPosition {
+                        offset_x: 0.0,
+                        offset_y: 0.0,
+                    },
+                    ContainerNode,
                     BackgroundColor(Color::oklcha(0.2221, 0., 0., 0.90)),
                     BorderRadius {
                         top_left: Val::Px(0.0),
@@ -1136,13 +1224,11 @@ pub fn wireless_list_popup(commands: &mut Commands) -> impl Bundle {
                         bottom_right: Val::Px(12.0),
                     },
                     children![
-                        wireless("Mecha"),
-                        divider(),
-                        wireless("Actonate"),
-                        divider(),
-                        wireless("Mecha 5g"),
-                        divider(),
-                        wireless("Actonate 5g"),
+                        Text::new("Loading data"),
+                        TextFont {
+                            font_size: 16.,
+                            ..Default::default()
+                        },
                     ]
                 )
             ]
@@ -1150,20 +1236,74 @@ pub fn wireless_list_popup(commands: &mut Commands) -> impl Bundle {
     )
 }
 
-fn wireless(name: &str) -> impl Bundle {
+fn wireless(
+    name: &str,
+    is_active: bool,
+    active_network_strength: u8,
+    font_assets: &FontAssets,
+    on_click: SystemId,
+) -> impl Bundle {
+    let status: String = if is_active { "Connected" } else { "" }.into();
+
+      let FontAssets {
+        wireless_low,
+        wireless_medium,
+        wireless_high,
+        wireless_warning,
+        settings_icon,
+        layout_wireless,
+        layout_settings,
+        ..
+    }  = font_assets.clone();
+
+    let wireless_icon: String = match active_network_strength {
+        0..=20 => Icon::WirelessLow.into(),
+        21..=50 => Icon::WirelessLow.into(),
+        51..=75 => Icon::WirelessMedium.into(),
+        76..=100 => Icon::WirelessHigh.into(),
+        _ => unreachable!(),
+    };
+    let icon_size = 24.;
+
     (
         Node {
             width: Val::Percent(100.0),
             height: Val::Px(26.0),
             justify_content: JustifyContent::SpaceBetween,
-            align_items: AlignItems::Center,
             margin: UiRect::vertical(Val::Px(20.)),
             ..default()
         },
+        CoreButton {
+            on_click: Some(on_click),
+            on_long_press: None,
+        },
+        WirelessEntry,
         children![
-            (StyledText::new("Icon")),
-            (StyledText::new(name),),
-            (StyledText::new("Connected"))
+            StyledText::builder()
+                .content(wireless_icon)
+                .font_size(icon_size)
+                .font(font_assets.font_icons.clone())
+                .build(),
+            // ImageNode::from_atlas_image(
+            //                 settings_icon.clone(),
+            //                 TextureAtlas::from(layout_settings.clone()),
+            //             ),
+            (
+                Node {
+                    width: Val::Percent(100.0),
+                    justify_content: JustifyContent::Start,
+                    align_items: AlignItems::Center,
+                    padding: UiRect {
+                        left: Val::Px(8.),
+                        right: Val::Px(0.),
+                        top: Val::Px(4.),
+                        bottom: Val::Px(0.),
+                    },
+                    ..default()
+                },
+                children![(StyledText::new(name),)]
+            ),
+            StyledText::new(status)
         ],
     )
 }

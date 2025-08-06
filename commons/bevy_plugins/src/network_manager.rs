@@ -20,6 +20,10 @@ pub struct WirelessEnabled(pub bool);
 
 #[derive(Resource, Default, Debug, Clone)]
 pub struct ActiveNetworkStrength(pub u8);
+
+#[derive(Resource, Default, Debug, Clone)]
+pub struct NetworkList(pub Vec<WirelessNetworkInfo>);
+
 #[derive(Resource)]
 pub struct NetworkResultReceiver {
     receiver: Mutex<Receiver<NetworkResult>>,
@@ -86,6 +90,7 @@ impl Plugin for NetworkManagerPlugin {
         app.insert_resource(NetworkManagerServiceResource { service: None })
             .insert_resource(NetworkManagerState::default())
             .insert_resource(WirelessEnabled::default())
+            .insert_resource(NetworkList::default())
             .insert_resource(ActiveNetworkStrength::default())
             .insert_resource(NetworkManagerDeviceStatus::default())
             .add_event::<NetworkActionEvent>()
@@ -450,7 +455,7 @@ fn handle_network_action_events(
 }
 
 // Polling system to insert write error into an event
-fn poll_network_action_result_events(event_receiver: ResMut<NetworkResultReceiver>, mut wifi_state: ResMut<WirelessEnabled>, mut network_strength: ResMut<ActiveNetworkStrength>, mut network_device_status: ResMut<NetworkManagerDeviceStatus>) {
+fn poll_network_action_result_events(event_receiver: ResMut<NetworkResultReceiver>, mut wifi_state: ResMut<WirelessEnabled>, mut network_strength: ResMut<ActiveNetworkStrength>, mut network_device_status: ResMut<NetworkManagerDeviceStatus>, mut network_list: ResMut<NetworkList>) {
     if let Ok(receiver) = event_receiver.receiver.lock() {
         while let Ok(event) = receiver.try_recv() {
             match event {
@@ -460,6 +465,7 @@ fn poll_network_action_result_events(event_receiver: ResMut<NetworkResultReceive
                 }
                 NetworkResult::ListNetworks(networks) => {
                     info!("network result: list of available networks: {:?}", networks);
+                    network_list.0 = networks;
                 }
                 NetworkResult::NetworkStrength(strength) => {
                     info!("network result: active network strength: {strength}");

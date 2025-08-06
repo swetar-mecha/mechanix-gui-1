@@ -290,4 +290,16 @@
     "image.extend_screen_none": File (
         path: "icons/extend_screen_none.png",
     ),
+
+    "image.settings_icon": File (
+        path: "icons/settings_icon.png",
+    ),
+
+    "layout.settings": TextureAtlasLayout (
+        tile_size_x: 33,
+        tile_size_y: 33,
+        columns: 1,
+        rows: 1
+    ),
+
 })

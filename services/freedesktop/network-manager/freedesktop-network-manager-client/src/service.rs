@@ -75,6 +75,7 @@ impl NetworkManagerService {
         // Convert raw access point data into user-friendly WirelessNetworkInfo structs.
         raw_access_points
             .into_iter()
+            .filter(|raw_ap| !raw_ap.ssid.is_empty())
             .map(|raw_ap| {
                 let signal_strength = raw_ap.strength;
                 // Determine the security type based on access point flags.
