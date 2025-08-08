@@ -256,29 +256,53 @@
         rows: 1
     ),
 
-    "image.wireless_warning": File (
-        path: "icons/wireless_warning.png",
+    "image.gray_wireless_warning": File (
+        path: "icons/gray_wireless_warning.png",
     ),
 
-    "image.wireless_high": File (
-        path: "icons/wireless_high.png",
+    "image.gray_wireless_high": File (
+        path: "icons/gray_wireless_high.png",
     ),
 
-    "image.wireless_low": File (
-        path: "icons/wireless_low.png",
+    "image.gray_wireless_low": File (
+        path: "icons/gray_wireless_low.png",
     ),
 
-    "image.wireless_medium": File (
-        path: "icons/wireless_medium.png",
+    "image.gray_wireless_medium": File (
+        path: "icons/gray_wireless_medium.png",
     ),
 
-    "image.wireless_none": File (
-        path: "icons/wireless_none.png",
+    "image.gray_wireless_none": File (
+        path: "icons/gray_wireless_none.png",
     ),
 
-    "image.wireless_off": File (
-        path: "icons/wireless_off.png",
+    "image.gray_wireless_off": File (
+        path: "icons/gray_wireless_off.png",
     ),
+
+    
+
+
+
+
+    "image.blue_wireless_high": File (
+        path: "icons/blue_wireless_high.png",
+    ),
+
+    "image.blue_wireless_low": File (
+        path: "icons/blue_wireless_low.png",
+    ),
+
+    "image.blue_wireless_medium": File (
+        path: "icons/blue_wireless_medium.png",
+    ),
+
+    "image.blue_wireless_none": File (
+        path: "icons/blue_wireless_none.png",
+    ),
+
+
+
 
     "layout.extend_screen": TextureAtlasLayout (
         tile_size_x: 44,

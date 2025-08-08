@@ -230,11 +230,11 @@ fn update_wireless_state(
 
         if wifi_state.0 {
             styled_button.active = Some(true);
-            styled_button.icon = Some(font_assets.wireless_none.clone());
+            styled_button.icon = Some(font_assets.gray_wireless_none.clone());
             styled_button.layout = Some(font_assets.layout_wireless.clone());
         } else {
             styled_button.active = Some(false);
-            styled_button.icon = Some(font_assets.wireless_off.clone());
+            styled_button.icon = Some(font_assets.gray_wireless_off.clone());
             styled_button.layout = Some(font_assets.layout_wireless.clone());
         }
     }
@@ -628,11 +628,11 @@ fn on_animation_background_completed(
                     screen_recording_on,
                     sound_low,
                     terminal,
-                    wireless_high,
-                    wireless_low,
-                    wireless_medium,
-                    wireless_off,
-                    wireless_warning,
+                    gray_wireless_high,
+                    gray_wireless_low,
+                    gray_wireless_medium,
+                    gray_wireless_off,
+                    gray_wireless_warning,
                     extend_screen_none,
                     layout_airplane,
                     layout_bluetooth,
@@ -799,7 +799,7 @@ fn on_animation_background_completed(
                         parent.spawn((
                             Wireless,
                             StyledButton::builder()
-                                .icon(wireless_off.clone())
+                                .icon(gray_wireless_off.clone())
                                 .layout(layout_wireless.clone())
                                 .on_click(on_toggle_wireless)
                                 .on_long_press(on_long_press_wireless)
@@ -1012,9 +1012,9 @@ fn spawn_menu_widget(
             font_assets.layout_screen_recording.clone(),
         ),
         "wifi" => (
-            font_assets.wireless_medium.clone(),
+            font_assets.gray_wireless_medium.clone(),
             font_assets.layout_wireless.clone(),
-            font_assets.wireless_off.clone(),
+            font_assets.gray_wireless_off.clone(),
             font_assets.layout_wireless.clone(),
         ),
         "bluetooth" => (
@@ -1076,9 +1076,9 @@ fn spawn_menu_widget(
             font_assets.layout_cell_signal.clone(),
         ),
         _ => (
-            font_assets.wireless_medium.clone(),
+            font_assets.gray_wireless_medium.clone(),
             font_assets.layout_wireless.clone(),
-            font_assets.wireless_off.clone(),
+            font_assets.gray_wireless_off.clone(),
             font_assets.layout_wireless.clone(),
         ),
     };
@@ -1245,22 +1245,51 @@ fn wireless(
 ) -> impl Bundle {
     let status: String = if is_active { "Connected" } else { "" }.into();
 
-      let FontAssets {
-        wireless_low,
-        wireless_medium,
-        wireless_high,
-        wireless_warning,
+    let FontAssets {
+        gray_wireless_low,
+        gray_wireless_medium,
+        gray_wireless_high,
+        gray_wireless_warning,
+
+        blue_wireless_low,
+        blue_wireless_medium,
+        blue_wireless_high,
+        blue_wireless_none,
         settings_icon,
         layout_wireless,
         layout_settings,
         ..
-    }  = font_assets.clone();
+    } = font_assets.clone();
 
-    let wireless_icon: String = match active_network_strength {
-        0..=20 => Icon::WirelessLow.into(),
-        21..=50 => Icon::WirelessLow.into(),
-        51..=75 => Icon::WirelessMedium.into(),
-        76..=100 => Icon::WirelessHigh.into(),
+    let wireless_icon = match active_network_strength {
+        0..=20 => {
+            if is_active {
+                blue_wireless_low
+            } else {
+                gray_wireless_low
+            }
+        }
+        21..=50 => {
+            if is_active {
+                blue_wireless_low
+            } else {
+                gray_wireless_low
+            }
+        }
+        51..=75 => {
+            if is_active {
+                blue_wireless_medium
+            } else {
+                gray_wireless_medium
+            }
+        }
+        76..=100 => {
+            if is_active {
+                blue_wireless_high
+            } else {
+                gray_wireless_high
+            }
+        }
         _ => unreachable!(),
     };
     let icon_size = 24.;
@@ -1279,15 +1308,10 @@ fn wireless(
         },
         WirelessEntry,
         children![
-            StyledText::builder()
-                .content(wireless_icon)
-                .font_size(icon_size)
-                .font(font_assets.font_icons.clone())
-                .build(),
-            // ImageNode::from_atlas_image(
-            //                 settings_icon.clone(),
-            //                 TextureAtlas::from(layout_settings.clone()),
-            //             ),
+            ImageNode::from_atlas_image(
+                wireless_icon.clone(),
+                TextureAtlas::from(layout_wireless.clone()),
+            ),
             (
                 Node {
                     width: Val::Percent(100.0),
