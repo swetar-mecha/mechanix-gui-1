@@ -87,6 +87,15 @@ pub struct RawAccessPointInfo {
     pub last_seen: i64,
 }
 
+#[derive(Debug, Clone, Default)]
+/// A known WiFi network.
+pub struct KnownNetworkResponse {
+    pub ssid: String,
+    pub flags: String,
+    // pub is_active: bool,
+}
+
+
 bitflags::bitflags! {
     /// Flags describing capabilities and features of a Wireless access point.
     #[derive(Default)]
@@ -138,6 +147,8 @@ pub trait NetworkManagerInterface: Send + Sync {
     ///
     /// Returns a vector of `WirelessNetworkInfo` describing each visible network.
     async fn list_networks(&self) -> Result<Vec<WirelessNetworkInfo>>;
+
+    async fn known_networks(&self) -> Result<Vec<KnownNetworkResponse>>;
 }
 
 #[derive(Debug, Default)]

@@ -60,6 +60,7 @@ fn setup(mut commands: Commands, assets: Res<AssetServer>) {
             ButtonAction::Wifi,
         ))
         .with_child((Text::new("WIFI"), TextColor(Color::srgb(0.9, 0.9, 0.9))));
+    
 }
 
 fn create_counter_text(commands: &mut Commands, assets: &AssetServer) {
@@ -117,7 +118,9 @@ fn button_system(
                     Some(ButtonAction::Wifi) => {
                         println!("Wifi button pressed");
                         // event_writer.write(NetworkActionEvent(NetworkAction::ToggleWifi(true)));
-                        event_writer.write(NetworkActionEvent(NetworkAction::ListNetworks));
+                        // event_writer.write(NetworkActionEvent(NetworkAction::ListNetworks));
+
+                        event_writer.write(NetworkActionEvent(NetworkAction::ListKnownNetworks));
                     }
                     _ => {
                         println!("no action");

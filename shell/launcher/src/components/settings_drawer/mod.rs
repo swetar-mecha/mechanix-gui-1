@@ -13,7 +13,7 @@ use bevy::{
 };
 use bevy_core_widgets::{CoreButton, CoreScrollArea};
 use bevy_plugins::network_manager::{
-    ActiveNetworkStrength, NetworkAction, NetworkActionEvent, NetworkList, WirelessEnabled,
+    ActiveNetworkStrength, NetworkAction, NetworkActionEvent, KnownNetworkList, WirelessEnabled,
 };
 use bevy_styled_widgets::prelude::{StyledText, StyledTextPlugin, ThemeManager, ThemeMode};
 
@@ -158,7 +158,7 @@ impl Plugin for SettingsDrawerPlugin {
                     .run_if(resource_changed::<WirelessEnabled>)
                     .run_if(resource_exists::<FontAssets>),
                 update_wireless_list_state
-                    .run_if(resource_changed::<NetworkList>)
+                    .run_if(resource_changed::<KnownNetworkList>)
                     .run_if(resource_exists::<FontAssets>),
                 update_airplane_mode_state
                     .run_if(resource_changed::<AirplaneModeEnabled>)
@@ -242,12 +242,13 @@ fn update_wireless_state(
 
 fn update_wireless_list_state(
     mut commands: Commands,
-    network_list: Res<NetworkList>,
+    network_list: Res<KnownNetworkList>,
     container_query: Query<Entity, With<ContainerNode>>,
     children_query: Query<&Children>,
     ui_node_query: Query<Entity, With<Node>>,
     font_assets: Res<FontAssets>,
 ) {
+    println!("update_wireless_list_state {:?}", network_list.clone());
     if network_list.is_changed() {
         if let Ok(container_entity) = container_query.single() {
             // First, remove existing UI elements inside the container
@@ -478,7 +479,7 @@ fn long_press_wireless(
     font_assets: Option<Res<FontAssets>>,
 ) {
     println!("long press wireless");
-    event_writer.write(NetworkActionEvent(NetworkAction::ListNetworks));
+    event_writer.write(NetworkActionEvent(NetworkAction::ListKnownNetworks));
     for entity in q_settings_drawer.iter_mut() {
         let popup_id = commands.spawn_empty().id();
         let popup = wireless_list_popup(&mut commands, font_assets.as_ref().unwrap());

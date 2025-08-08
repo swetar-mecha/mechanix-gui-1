@@ -3,12 +3,15 @@
 use super::interfaces::NetworkManagerInterface;
 use crate::errors::NetworkManagerError;
 use crate::interfaces::wireless::{
-    AccessPointEvent, EventType, NM80211ApFlags, NMState, WirelessNetworkInfo,
+    AccessPointEvent, EventType, KnownNetworkResponse, NM80211ApFlags, NMState, RawAccessPointInfo,
+    WirelessNetworkInfo,
 };
 use crate::proxies::NetworkManagerProxy;
+use crate::service;
 use anyhow::Result;
 use futures::StreamExt;
 use log::{debug, error, info};
+use std::os::linux::net;
 use std::sync::mpsc;
 use zbus::Connection;
 
@@ -94,6 +97,40 @@ impl NetworkManagerService {
                 })
             })
             .collect()
+    }
+
+    /// List current available saved networks
+    pub async fn known_networks(&self) -> Result<Vec<WirelessNetworkInfo>, NetworkManagerError> {
+        let known_networks_response = self
+            .proxy
+            .known_networks()
+            .await
+            .map_err(NetworkManagerError::from)?;
+
+        let available_networks = self
+            .list_networks()
+            .await
+            .map_err(NetworkManagerError::from)?;
+
+        let mut saved_networks: Vec<WirelessNetworkInfo> = Vec::new();
+
+        for network in available_networks.clone() {
+            let mut is_known = false;
+
+            if !network.ssid.is_empty() {
+                for known_network in known_networks_response.iter() {
+                    if known_network.ssid == network.ssid {
+                        is_known = true;
+                        break;
+                    }
+                }
+                if is_known {
+                    saved_networks.push(network)
+                };
+            }
+        }
+        println!("saved_network {:?} ", saved_networks);
+        Ok(saved_networks)
     }
 
     /// Attempts to connect to a Wireless network with the given SSID and optional password.
@@ -357,8 +394,8 @@ impl NetworkManagerService {
 mod tests {
     use super::*;
     use crate::interfaces::wireless::RawAccessPointInfo;
-    use crate::proxies::wireless::{AccessPointAddedStream, AccessPointRemovedStream};
     use crate::proxies::ProxyError;
+    use crate::proxies::wireless::{AccessPointAddedStream, AccessPointRemovedStream};
     use anyhow::Result;
     use mockall::{mock, predicate::*};
 
