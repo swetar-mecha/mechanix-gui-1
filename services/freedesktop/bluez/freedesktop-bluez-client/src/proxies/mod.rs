@@ -41,7 +41,7 @@
 
 use super::interfaces::device::BluetoothDevice;
 use adapter1::Adapter1Proxy;
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use async_trait::async_trait;
 use device::build_device_proxy;
 use log::{debug, error, info, trace};
@@ -157,7 +157,6 @@ impl<'a> BluezInterface for BluezProxy<'a> {
         }
     }
 
-
     /// Discovers and returns a list of available Bluetooth devices.
     ///
     /// This asynchronous method performs Bluetooth device discovery by interacting with the BlueZ D-Bus API.
@@ -211,7 +210,7 @@ impl<'a> BluezInterface for BluezProxy<'a> {
         }
 
         trace!("discovery started, waiting for devices...");
-        tokio::time::sleep(discovery_duration).await;
+        std::thread::sleep(discovery_duration);
         trace!("stopping discovery...");
 
         // Stop the discovery process
@@ -284,11 +283,7 @@ impl<'a> BluezInterface for BluezProxy<'a> {
 
         // Create the device path string
         // Replace ":" with "_" to create a valid object path
-        let device_path_str = format!(
-            "{}_{}",
-            DEVICE_OBJECT_PATH,
-            address.replace(":", "_")
-        );
+        let device_path_str = format!("{}_{}", DEVICE_OBJECT_PATH, address.replace(":", "_"));
         debug!("device path: {}", device_path_str);
 
         // Create the device path object from the string
@@ -351,11 +346,7 @@ impl<'a> BluezInterface for BluezProxy<'a> {
     /// ```
     async fn disconnect(&self, address: &str) -> Result<(), ProxyError> {
         let cn = &self.0.connection();
-        let device_path_str = format!(
-            "{}_{}",
-            DEVICE_OBJECT_PATH,
-            address.replace(":", "_")
-        );
+        let device_path_str = format!("{}_{}", DEVICE_OBJECT_PATH, address.replace(":", "_"));
         let _device_path = match ObjectPath::try_from(device_path_str.as_str()) {
             Ok(path) => path,
             Err(e) => {
@@ -443,7 +434,9 @@ impl<'a> BluezInterface for BluezProxy<'a> {
         let stream = proxy.receive_powered_changed().await;
         Ok(stream)
     }
-    async fn stream_bluetooth_events(&self) -> Result<(InterfacesAddedStream, InterfacesRemovedStream), ProxyError> {
+    async fn stream_bluetooth_events(
+        &self,
+    ) -> Result<(InterfacesAddedStream, InterfacesRemovedStream), ProxyError> {
         let cn = &self.0.connection();
         let bluez = BluezProxy::new(&cn).await.unwrap();
         let added = match bluez.receive_interfaces_added().await {

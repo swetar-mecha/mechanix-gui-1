@@ -35,10 +35,14 @@ pub struct BluetoothState {
 #[derive(Event)]
 pub struct BluetoothActionEvent(pub BluetoothAction);
 
+#[derive(Resource, Default, Debug, Clone)]
+pub struct ListPairedDevices(pub Vec<BluetoothDevice>);
+
 #[derive(Debug, Clone)]
 pub enum BluetoothAction {
     ToggleBluetooth(bool),
     ListAvailableDevices,
+    ListPairedDevices,
     ConnectToDevice(String),
     DisconnectDevice(String),
     ListConnectedDevices,
@@ -51,6 +55,7 @@ pub enum BluetoothResult {
     BluetoothStatus(bool),
     BluetoothEvent(BluetoothEvent),
     ListAvailableDevices(Vec<BluetoothDevice>),
+    ListPairedDevices(Vec<BluetoothDevice>),
     ConnectDevice(bool),
     DisconnectDevice(bool),
     ListConnectedDevices(Vec<BluetoothDevice>),
@@ -81,6 +86,7 @@ impl Plugin for BluetoothPlugin {
             .insert_resource(BluetoothState::default())
             .insert_resource(BluetoothEnabledStatus::default())
             .insert_resource(BluetoothDeviceConnectedStatus::default())
+            .insert_resource(ListPairedDevices::default())
             .add_event::<BluetoothActionEvent>()
             .add_systems(Startup, (init_bluetooth_service, setup_bluetooth_channel)) // Async task so temp move service result to static
             .add_systems(
@@ -256,6 +262,45 @@ fn handle_bluetooth_action_events(
                         .detach();
                 }
             }
+            BluetoothAction::ListPairedDevices => {
+                info!("bluetooth action: list paired devices");
+                if let Some(service) = &mut service.service {
+                    let service = service.clone();
+                    let result_sender = sender.0.clone();
+                    pool.spawn(async move {
+                        match service.get_available_devices(std::time::Duration::from_secs(1)).await {
+                            Ok(devices) => {
+                                let mut devices: Vec<BluetoothDevice> = devices
+                                    .iter()
+                                    .filter(|device| device.paired || device.connected)
+                                    .cloned()
+                                    .collect();
+
+                                devices.sort_by_key(|d| !(d.connected)); 
+
+                                if let Err(err) =
+                                    result_sender.send(BluetoothResult::ListPairedDevices(devices))
+                                {
+                                    error!("failed to send list paired devices: {err}");
+                                }
+                            }
+                            Err(err) => {
+                                error!("failed to list paired devices: {err}");
+                                let error_type = ErrorType::ActionFailed {
+                                    action: BluetoothAction::ListPairedDevices,
+                                    message: "Failed to list paired devices".to_string(),
+                                };
+                                if let Err(err) =
+                                    result_sender.send(BluetoothResult::Error(error_type))
+                                {
+                                    error!("failed to send list paired devices error: {err}");
+                                }
+                            }
+                        };
+                    })
+                        .detach();
+                                }
+            }
             BluetoothAction::ConnectToDevice(device_address) => {
                 info!("bluetooth action: connect to device: {device_address}");
                 if let Some(service) = &mut service.service {
@@ -409,6 +454,7 @@ fn poll_bluetooth_action_result_events(
     event_receiver: ResMut<BluetoothResultReceiver>,
     mut bluetooth_status: ResMut<BluetoothEnabledStatus>,
     mut bluetooth_connection_status: ResMut<BluetoothDeviceConnectedStatus>,
+    mut bluetooth_paired_devices: ResMut<ListPairedDevices>,
 ) {
     if let Ok(receiver) = event_receiver.receiver.lock() {
         while let Ok(event) = receiver.try_recv() {
@@ -430,6 +476,10 @@ fn poll_bluetooth_action_result_events(
                             }
                         }
                     }
+                }
+                BluetoothResult::ListPairedDevices(devices) => {
+                    info!("list of paired devices: {:?}", devices);
+                    bluetooth_paired_devices.0 = devices;
                 }
                 _ => {
                     // ignore other events

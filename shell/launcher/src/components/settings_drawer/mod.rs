@@ -12,19 +12,22 @@ use bevy::{
     window::CompositeAlphaMode,
 };
 use bevy_core_widgets::{CoreButton, CoreScrollArea};
+use bevy_plugins::bluetooth::{
+    BluetoothAction, BluetoothActionEvent, BluetoothEnabledStatus, ListPairedDevices,
+};
 use bevy_plugins::network_manager::{
-    ActiveNetworkStrength, NetworkAction, NetworkActionEvent, KnownNetworkList, WirelessEnabled,
+    ActiveNetworkStrength, KnownNetworkList, NetworkAction, NetworkActionEvent, WirelessEnabled,
 };
 use bevy_styled_widgets::prelude::{StyledText, StyledTextPlugin, ThemeManager, ThemeMode};
 
 use crate::{
-    components::{AssetsLoadingState, Clock, get_current_datetime},
+    components::{get_current_datetime, AssetsLoadingState, Clock},
     styled_card::StyledCard,
     utils::{FontAssets, Icon},
     widgets::{
-        LauncherStyledWidgetsPlugin,
         button::{ButtonSize, ButtonVariant, StyledButton},
         slider::StyledSlider,
+        LauncherStyledWidgetsPlugin,
     },
 };
 use bevy_asset_loader::prelude::*;
@@ -52,6 +55,9 @@ struct ContainerNode;
 struct WirelessEntry;
 
 #[derive(Component)]
+struct BluetoothEntry;
+
+#[derive(Component)]
 pub struct Wireless;
 
 #[derive(Component)]
@@ -68,12 +74,6 @@ pub struct Microphone;
 
 #[derive(Component)]
 pub struct ScreenRecording;
-
-// #[derive(Resource, Default, Debug, Clone)]
-// pub struct WirelessEnabled(pub bool);
-
-#[derive(Resource, Default, Debug, Clone)]
-pub struct BluetoothEnabled(pub bool);
 
 #[derive(Resource, Default, Debug, Clone)]
 pub struct RotationEnabled(pub bool);
@@ -114,8 +114,6 @@ impl Plugin for SettingsDrawerPlugin {
         app.add_event::<SettingsPanelBackgroudEvent>();
 
         app.insert_state(Screens::Homescreen);
-        // app.insert_resource(WirelessEnabled(true));
-        app.init_resource::<BluetoothEnabled>();
         app.insert_resource(RotationEnabled(true));
         app.insert_resource(AirplaneModeEnabled(true));
         app.init_resource::<PowerSavingEnabled>();
@@ -167,7 +165,10 @@ impl Plugin for SettingsDrawerPlugin {
                     .run_if(resource_changed::<RotationEnabled>)
                     .run_if(resource_exists::<FontAssets>),
                 update_bluetooth_state
-                    .run_if(resource_changed::<BluetoothEnabled>)
+                    .run_if(resource_changed::<BluetoothEnabledStatus>)
+                    .run_if(resource_exists::<FontAssets>),
+                update_bluetooth_list_state
+                    .run_if(resource_changed::<ListPairedDevices>)
                     .run_if(resource_exists::<FontAssets>),
                 update_microphone_state
                     .run_if(resource_changed::<MicrophoneEnabled>)
@@ -182,11 +183,11 @@ impl Plugin for SettingsDrawerPlugin {
 
 fn update_bluetooth_state(
     mut query: Query<&mut StyledButton, With<Bluetooth>>,
-    bluetooth_state: Res<BluetoothEnabled>,
+    bluetooth_state: Res<BluetoothEnabledStatus>,
     font_assets: Res<FontAssets>,
 ) {
     for mut styled_button in &mut query {
-        info!("BluetoothEnabled is updated :{:?}", bluetooth_state);
+        info!("BluetoothEnabledStatus is updated :{:?}", bluetooth_state);
 
         if bluetooth_state.0 {
             styled_button.active = Some(true);
@@ -226,11 +227,14 @@ fn update_wireless_state(
     font_assets: Res<FontAssets>,
 ) {
     for mut styled_button in &mut query {
-        info!("WirelessEnabled is updated :{:?}", wifi_state);
+        info!(
+            "WirelessEnabled is updated Settings drawer :{:?}",
+            wifi_state
+        );
 
         if wifi_state.0 {
             styled_button.active = Some(true);
-            styled_button.icon = Some(font_assets.gray_wireless_none.clone());
+            styled_button.icon = Some(font_assets.blue_wireless_none.clone());
             styled_button.layout = Some(font_assets.layout_wireless.clone());
         } else {
             styled_button.active = Some(false);
@@ -269,7 +273,7 @@ fn update_wireless_list_state(
             // Now populate the container with the new wireless entries
             for (i, network) in network_list.0.iter().enumerate() {
                 commands.entity(container_entity).with_children(|parent| {
-                    parent.spawn(wireless(
+                    parent.spawn(wirelessClickableRow(
                         &network.ssid,
                         network.is_active,
                         network.signal_strength,
@@ -279,6 +283,51 @@ fn update_wireless_list_state(
 
                     // parent.spawn(divider());
                     if i != network_list.0.len() - 1 {
+                        parent.spawn(divider());
+                    }
+                });
+            }
+        }
+    }
+}
+
+fn update_bluetooth_list_state(
+    mut commands: Commands,
+    bluetooth_list: Res<ListPairedDevices>,
+    container_query: Query<Entity, With<ContainerNode>>,
+    children_query: Query<&Children>,
+    ui_node_query: Query<Entity, With<Node>>,
+    font_assets: Res<FontAssets>,
+) {
+    println!("update_bluetooth_list_state {:?}", bluetooth_list.clone());
+    if bluetooth_list.is_changed() {
+        if let Ok(container_entity) = container_query.single() {
+            // First, remove existing UI elements inside the container
+            if let Ok(children) = children_query.get(container_entity) {
+                for child in children.iter() {
+                    if ui_node_query.contains(child) {
+                        commands.entity(child).despawn();
+                    }
+                }
+            }
+
+            let on_click = commands.register_system(
+                |mut commands: Commands, q_search: Query<Entity, With<BluetoothEntry>>| {
+                    println!("Bluetooth entry clicked");
+                },
+            );
+
+            // Now populate the container with the new wireless entries
+            for (i, bluetooth) in bluetooth_list.0.iter().enumerate() {
+                commands.entity(container_entity).with_children(|parent| {
+                    parent.spawn(bluetoothClickableRow(
+                        &bluetooth.name,
+                        bluetooth.connected,
+                        &font_assets,
+                        on_click,
+                    ));
+
+                    if i != bluetooth_list.0.len() - 1 {
                         parent.spawn(divider());
                     }
                 });
@@ -468,8 +517,17 @@ fn toggle_auto_rotation(mut enabled: ResMut<RotationEnabled>) {
     enabled.0 = !enabled.0;
 }
 
-fn toggle_wireless(mut enabled: ResMut<WirelessEnabled>) {
+fn settings_clicked(mut event_writer: EventWriter<SettingsClickedEvent>) {
+    println!("settings clicked");
+    warn!("TODO: Add settings clicked event & integration!");
+}
+
+fn toggle_wireless(
+    mut enabled: ResMut<WirelessEnabled>,
+    mut event_writer: EventWriter<NetworkActionEvent>,
+) {
     enabled.0 = !enabled.0;
+    event_writer.write(NetworkActionEvent(NetworkAction::ToggleWifi(enabled.0)));
 }
 
 fn long_press_wireless(
@@ -482,14 +540,36 @@ fn long_press_wireless(
     event_writer.write(NetworkActionEvent(NetworkAction::ListKnownNetworks));
     for entity in q_settings_drawer.iter_mut() {
         let popup_id = commands.spawn_empty().id();
-        let popup = wireless_list_popup(&mut commands, font_assets.as_ref().unwrap());
+        let popup = list_popup(&mut commands, font_assets.as_ref().unwrap(), "Wi-Fi");
         commands.entity(popup_id).insert(popup);
         commands.entity(entity).add_child(popup_id);
     }
 }
 
-fn toggle_bluetooth(mut enabled: ResMut<BluetoothEnabled>) {
+fn long_press_bluetooth(
+    mut commands: Commands,
+    mut q_settings_drawer: Query<Entity, With<SettingsDrawerRoot>>,
+    mut event_writer: EventWriter<BluetoothActionEvent>,
+    font_assets: Option<Res<FontAssets>>,
+) {
+    println!("long press bluetooth");
+    event_writer.write(BluetoothActionEvent(BluetoothAction::ListPairedDevices));
+    for entity in q_settings_drawer.iter_mut() {
+        let popup_id = commands.spawn_empty().id();
+        let popup = list_popup(&mut commands, font_assets.as_ref().unwrap(), "Bluetooth");
+        commands.entity(popup_id).insert(popup);
+        commands.entity(entity).add_child(popup_id);
+    }
+}
+
+fn toggle_bluetooth(
+    mut enabled: ResMut<BluetoothEnabledStatus>,
+    mut event_writer: EventWriter<BluetoothActionEvent>,
+) {
     enabled.0 = !enabled.0;
+    event_writer.write(BluetoothActionEvent(BluetoothAction::ToggleBluetooth(
+        enabled.0,
+    )));
 }
 
 fn toggle_airplane_mode(mut enabled: ResMut<AirplaneModeEnabled>) {
@@ -511,14 +591,16 @@ fn on_animation_background_completed(
     font_assets: Option<Res<FontAssets>>,
     mut screens_state: ResMut<NextState<Screens>>,
 ) {
-    let on_toogle_theme_mode = commands.register_system(toggle_mode);
+    let on_toggle_theme_mode = commands.register_system(toggle_mode);
     let on_toggle_auto_rotation = commands.register_system(toggle_auto_rotation);
     let on_toggle_wireless = commands.register_system(toggle_wireless);
     let on_long_press_wireless = commands.register_system(long_press_wireless);
+    let on_long_press_bluetooth = commands.register_system(long_press_bluetooth);
     let on_toggle_bluetooth = commands.register_system(toggle_bluetooth);
     let on_toggle_airplane_mode = commands.register_system(toggle_airplane_mode);
     let on_toggle_screen_recording = commands.register_system(toggle_screen_recording);
     let on_toggle_microphone = commands.register_system(toggle_microphone);
+    let on_settings_click = commands.register_system(settings_clicked);
 
     if font_assets.is_none() {
         return;
@@ -813,6 +895,7 @@ fn on_animation_background_completed(
                                 .icon(bluetooth_off.clone())
                                 .layout(layout_bluetooth.clone())
                                 .on_click(on_toggle_bluetooth)
+                                .on_long_press(on_long_press_bluetooth)
                                 .build(),
                         ));
 
@@ -1132,7 +1215,11 @@ fn popup_click(
     }
 }
 
-pub fn wireless_list_popup(commands: &mut Commands, font_assets: &FontAssets) -> impl Bundle {
+pub fn list_popup(
+    commands: &mut Commands,
+    font_assets: &FontAssets,
+    header_text: &str,
+) -> impl Bundle {
     let on_popup_click = commands.register_system(popup_click);
     let FontAssets {
         settings_icon,
@@ -1187,11 +1274,16 @@ pub fn wireless_list_popup(commands: &mut Commands, font_assets: &FontAssets) ->
                     BackgroundColor(Color::oklch(0.4313, 0., 0.)),
                     children![
                         HeaderNode,
-                        StyledText::new("Wi-Fi"),
-                        ImageNode::from_atlas_image(
-                            settings_icon.clone(),
-                            TextureAtlas::from(layout_settings.clone()),
-                        ),
+                        StyledText::new(header_text),
+                        StyledButton::builder()
+                            .icon(settings_icon.clone())
+                            .layout(layout_settings.clone())
+                            .on_click(on_settings_click)
+                            .build(),
+                        // ImageNode::from_atlas_image(
+                        //     settings_icon.clone(),
+                        //     TextureAtlas::from(layout_settings.clone()),
+                        // ),
                     ]
                 ),
                 (
@@ -1224,20 +1316,20 @@ pub fn wireless_list_popup(commands: &mut Commands, font_assets: &FontAssets) ->
                         bottom_left: Val::Px(12.0),
                         bottom_right: Val::Px(12.0),
                     },
-                    children![
-                        Text::new("Loading data"),
-                        TextFont {
-                            font_size: 16.,
-                            ..Default::default()
-                        },
-                    ]
+                    // children![
+                    //     Text::new("Loading data"),
+                    //     TextFont {
+                    //         font_size: 16.,
+                    //         ..Default::default()
+                    //     },
+                    // ]
                 )
             ]
         )],
     )
 }
 
-fn wireless(
+fn wirelessClickableRow(
     name: &str,
     is_active: bool,
     active_network_strength: u8,
@@ -1312,6 +1404,68 @@ fn wireless(
             ImageNode::from_atlas_image(
                 wireless_icon.clone(),
                 TextureAtlas::from(layout_wireless.clone()),
+            ),
+            (
+                Node {
+                    width: Val::Percent(100.0),
+                    justify_content: JustifyContent::Start,
+                    align_items: AlignItems::Center,
+                    padding: UiRect {
+                        left: Val::Px(8.),
+                        right: Val::Px(0.),
+                        top: Val::Px(4.),
+                        bottom: Val::Px(0.),
+                    },
+                    ..default()
+                },
+                children![(StyledText::new(name),)]
+            ),
+            StyledText::new(status)
+        ],
+    )
+}
+
+fn bluetoothClickableRow(
+    name: &str,
+    is_active: bool,
+    font_assets: &FontAssets,
+    on_click: SystemId,
+) -> impl Bundle {
+    let status: String = if is_active { "Connected" } else { "" }.into();
+
+    let FontAssets {
+        bluetooth_on,
+        bluetooth_off,
+        settings_icon,
+        layout_bluetooth,
+        layout_settings,
+        ..
+    } = font_assets.clone();
+
+    let bluetooth_icon = if is_active {
+        bluetooth_on
+    } else {
+        bluetooth_off
+    };
+    let icon_size = 24.;
+
+    (
+        Node {
+            width: Val::Percent(100.0),
+            height: Val::Px(26.0),
+            justify_content: JustifyContent::SpaceBetween,
+            margin: UiRect::vertical(Val::Px(20.)),
+            ..default()
+        },
+        CoreButton {
+            on_click: Some(on_click),
+            on_long_press: None,
+        },
+        BluetoothEntry,
+        children![
+            ImageNode::from_atlas_image(
+                bluetooth_icon.clone(),
+                TextureAtlas::from(layout_bluetooth.clone()),
             ),
             (
                 Node {
