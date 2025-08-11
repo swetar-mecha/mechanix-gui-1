@@ -69,9 +69,6 @@ pub struct Microphone;
 #[derive(Component)]
 pub struct ScreenRecording;
 
-// #[derive(Resource, Default, Debug, Clone)]
-// pub struct WirelessEnabled(pub bool);
-
 #[derive(Resource, Default, Debug, Clone)]
 pub struct BluetoothEnabled(pub bool);
 
@@ -114,7 +111,6 @@ impl Plugin for SettingsDrawerPlugin {
         app.add_event::<SettingsPanelBackgroudEvent>();
 
         app.insert_state(Screens::Homescreen);
-        // app.insert_resource(WirelessEnabled(true));
         app.init_resource::<BluetoothEnabled>();
         app.insert_resource(RotationEnabled(true));
         app.insert_resource(AirplaneModeEnabled(true));
@@ -224,13 +220,15 @@ fn update_wireless_state(
     mut query: Query<&mut StyledButton, With<Wireless>>,
     wifi_state: Res<WirelessEnabled>,
     font_assets: Res<FontAssets>,
+    mut event_writer: EventWriter<NetworkActionEvent>,
 ) {
     for mut styled_button in &mut query {
         info!("WirelessEnabled is updated :{:?}", wifi_state);
+        event_writer.write(NetworkActionEvent(NetworkAction::ToggleWifi(wifi_state.0)));
 
         if wifi_state.0 {
             styled_button.active = Some(true);
-            styled_button.icon = Some(font_assets.gray_wireless_none.clone());
+            styled_button.icon = Some(font_assets.blue_wireless_none.clone());
             styled_button.layout = Some(font_assets.layout_wireless.clone());
         } else {
             styled_button.active = Some(false);
