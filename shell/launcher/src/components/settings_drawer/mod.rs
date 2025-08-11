@@ -1,3 +1,13 @@
+use crate::{
+    components::{AssetsLoadingState, Clock, get_current_datetime},
+    styled_card::StyledCard,
+    utils::{FontAssets, Icon},
+    widgets::{
+        LauncherStyledWidgetsPlugin,
+        button::{ButtonSize, ButtonVariant, StyledButton},
+        slider::StyledSlider,
+    },
+};
 use bevy::{
     asset::meta::Settings,
     color::palettes::{
@@ -11,6 +21,7 @@ use bevy::{
     scene::ron::de,
     window::CompositeAlphaMode,
 };
+use bevy_asset_loader::prelude::*;
 use bevy_core_widgets::{CoreButton, CoreScrollArea};
 use bevy_plugins::bluetooth::{
     BluetoothAction, BluetoothActionEvent, BluetoothEnabledStatus, ListPairedDevices,
@@ -19,18 +30,7 @@ use bevy_plugins::network_manager::{
     ActiveNetworkStrength, KnownNetworkList, NetworkAction, NetworkActionEvent, WirelessEnabled,
 };
 use bevy_styled_widgets::prelude::{StyledText, StyledTextPlugin, ThemeManager, ThemeMode};
-
-use crate::{
-    components::{AssetsLoadingState, Clock, get_current_datetime},
-    styled_card::StyledCard,
-    utils::{FontAssets, Icon},
-    widgets::{
-        LauncherStyledWidgetsPlugin,
-        button::{ButtonSize, ButtonVariant, StyledButton},
-        slider::StyledSlider,
-    },
-};
-use bevy_asset_loader::prelude::*;
+use core::fmt;
 
 #[derive(Debug, States, Hash, Clone, Eq, PartialEq)]
 pub enum Screens {
@@ -106,6 +106,26 @@ pub struct SettingsItemText {
 
 #[derive(Component)]
 pub struct StyledPopup;
+
+// network or bluetooth device state
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DeviceStatus {
+    Connecting,
+    Disconnecting,
+    Connected,
+    Unknown,
+}
+
+impl fmt::Display for DeviceStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DeviceStatus::Connecting => write!(f, "Connecting"),
+            DeviceStatus::Disconnecting => write!(f, "Disconnecting"),
+            DeviceStatus::Connected => write!(f, "Connected"),
+            DeviceStatus::Unknown => write!(f, ""),
+        }
+    }
+}
 
 pub struct SettingsDrawerPlugin;
 
@@ -312,14 +332,28 @@ fn update_bluetooth_list_state(
                 }
             }
 
-            let on_click = commands.register_system(
-                |mut commands: Commands, q_search: Query<Entity, With<BluetoothEntry>>| {
-                    println!("Bluetooth entry clicked");
-                },
-            );
-
             // Now populate the container with the new wireless entries
             for (i, bluetooth) in bluetooth_list.0.iter().enumerate() {
+                let bluetooth_clone = bluetooth.clone();
+
+                let on_click = commands.register_system(
+                    move |mut commands: Commands,
+                            q_status_text: Query<&mut StyledText, With<BluetoothEntry>>,
+                          mut event_writer: EventWriter<BluetoothActionEvent>| {
+                        println!("Bluetooth entry clicked : {:?} ", bluetooth_clone);
+
+                        if !bluetooth_clone.connected && bluetooth_clone.paired {
+                            event_writer.write(BluetoothActionEvent(
+                                BluetoothAction::ConnectToDevice(bluetooth_clone.address.clone()),
+                            ));
+                        } else {
+                            event_writer.write(BluetoothActionEvent(
+                                BluetoothAction::DisconnectDevice(bluetooth_clone.address.clone()),
+                            ));
+                        }
+                    },
+                );
+
                 commands.entity(container_entity).with_children(|parent| {
                     parent.spawn(bluetooth_clickable_row(
                         &bluetooth.name,
@@ -1281,7 +1315,7 @@ pub fn list_popup(
                                     .layout(layout_settings.clone())
                                     .build(),
                             ]
-                        ) 
+                        )
                     ]
                 ),
                 (
@@ -1334,7 +1368,12 @@ fn wireless_clickable_row(
     font_assets: &FontAssets,
     on_click: SystemId,
 ) -> impl Bundle {
-    let status: String = if is_active { "Connected" } else { "" }.into();
+    let status: String = if is_active {
+        DeviceStatus::Connected
+    } else {
+        DeviceStatus::Unknown
+    }
+    .to_string();
 
     let FontAssets {
         gray_wireless_low,
@@ -1429,7 +1468,12 @@ fn bluetooth_clickable_row(
     font_assets: &FontAssets,
     on_click: SystemId,
 ) -> impl Bundle {
-    let status: String = if is_active { "Connected" } else { "" }.into();
+    let status: String = if is_active {
+        DeviceStatus::Connected
+    } else {
+        DeviceStatus::Unknown
+    }
+    .to_string();
 
     let FontAssets {
         bluetooth_on,
