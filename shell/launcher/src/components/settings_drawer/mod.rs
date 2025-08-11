@@ -21,13 +21,13 @@ use bevy_plugins::network_manager::{
 use bevy_styled_widgets::prelude::{StyledText, StyledTextPlugin, ThemeManager, ThemeMode};
 
 use crate::{
-    components::{get_current_datetime, AssetsLoadingState, Clock},
+    components::{AssetsLoadingState, Clock, get_current_datetime},
     styled_card::StyledCard,
     utils::{FontAssets, Icon},
     widgets::{
+        LauncherStyledWidgetsPlugin,
         button::{ButtonSize, ButtonVariant, StyledButton},
         slider::StyledSlider,
-        LauncherStyledWidgetsPlugin,
     },
 };
 use bevy_asset_loader::prelude::*;
@@ -274,7 +274,7 @@ fn update_wireless_list_state(
             // Now populate the container with the new wireless entries
             for (i, network) in network_list.0.iter().enumerate() {
                 commands.entity(container_entity).with_children(|parent| {
-                    parent.spawn(wirelessClickableRow(
+                    parent.spawn(wireless_clickable_row(
                         &network.ssid,
                         network.is_active,
                         network.signal_strength,
@@ -321,7 +321,7 @@ fn update_bluetooth_list_state(
             // Now populate the container with the new wireless entries
             for (i, bluetooth) in bluetooth_list.0.iter().enumerate() {
                 commands.entity(container_entity).with_children(|parent| {
-                    parent.spawn(bluetoothClickableRow(
+                    parent.spawn(bluetooth_clickable_row(
                         &bluetooth.name,
                         bluetooth.connected,
                         &font_assets,
@@ -518,11 +518,6 @@ fn toggle_auto_rotation(mut enabled: ResMut<RotationEnabled>) {
     enabled.0 = !enabled.0;
 }
 
-fn settings_clicked(mut event_writer: EventWriter<SettingsClickedEvent>) {
-    println!("settings clicked");
-    warn!("TODO: Add settings clicked event & integration!");
-}
-
 fn toggle_wireless(
     mut enabled: ResMut<WirelessEnabled>,
     mut event_writer: EventWriter<NetworkActionEvent>,
@@ -601,7 +596,6 @@ fn on_animation_background_completed(
     let on_toggle_airplane_mode = commands.register_system(toggle_airplane_mode);
     let on_toggle_screen_recording = commands.register_system(toggle_screen_recording);
     let on_toggle_microphone = commands.register_system(toggle_microphone);
-    let on_settings_click = commands.register_system(settings_clicked);
 
     if font_assets.is_none() {
         return;
@@ -1276,15 +1270,18 @@ pub fn list_popup(
                     children![
                         HeaderNode,
                         StyledText::new(header_text),
-                        StyledButton::builder()
-                            .icon(settings_icon.clone())
-                            .layout(layout_settings.clone())
-                            .on_click(on_settings_click)
-                            .build(),
-                        // ImageNode::from_atlas_image(
-                        //     settings_icon.clone(),
-                        //     TextureAtlas::from(layout_settings.clone()),
-                        // ),
+                        (
+                            Node {
+                                align_self: AlignSelf::End,
+                                ..default()
+                            },
+                            children![
+                                StyledButton::builder()
+                                    .icon(settings_icon.clone())
+                                    .layout(layout_settings.clone())
+                                    .build(),
+                            ]
+                        ) 
                     ]
                 ),
                 (
@@ -1330,7 +1327,7 @@ pub fn list_popup(
     )
 }
 
-fn wirelessClickableRow(
+fn wireless_clickable_row(
     name: &str,
     is_active: bool,
     active_network_strength: u8,
@@ -1426,7 +1423,7 @@ fn wirelessClickableRow(
     )
 }
 
-fn bluetoothClickableRow(
+fn bluetooth_clickable_row(
     name: &str,
     is_active: bool,
     font_assets: &FontAssets,
