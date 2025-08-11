@@ -225,6 +225,7 @@ fn update_wireless_state(
     mut query: Query<&mut StyledButton, With<Wireless>>,
     wifi_state: Res<WirelessEnabled>,
     font_assets: Res<FontAssets>,
+    mut event_writer: EventWriter<NetworkActionEvent>,
 ) {
     for mut styled_button in &mut query {
         info!(
