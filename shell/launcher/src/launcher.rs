@@ -7,6 +7,7 @@ use bevy_plugins::bluetooth::BluetoothEnabledStatus;
 use bevy_plugins::network_manager::WirelessEnabled;
 use bevy_plugins::upower::UPowerPlugin;
 use bevy_plugins::{BluetoothPlugin, NetworkManagerPlugin};
+use bevy_plugins::pulse_audio::PulseAudioPlugin;
 use bevy_smithay::{
     SmithayPlugin, SmithayWindowType,
     prelude::{layer_shell::LayerShellSettings, subsurface::Anchor},
@@ -133,6 +134,7 @@ pub fn run_launcher() {
         .add_plugins(NetworkManagerPlugin)
         .add_plugins(BluetoothPlugin)
         .add_plugins(UPowerPlugin)
+        .add_plugins(PulseAudioPlugin)
         // System to exit on Escape key press
         .add_systems(Update, exit_on_esc)
         .run();

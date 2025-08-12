@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use bevy::prelude::{Event, Resource};
 use freedesktop_pulseaudio_client::service::{DeviceInfo, PulseAudioService};
 use libpulse_binding::volume::ChannelVolumes;
+use std::default;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
 
@@ -16,6 +17,9 @@ pub struct PulseAudioResultReceiver {
     receiver: Mutex<Receiver<PulseAudioResult>>,
 }
 
+#[derive(Resource, Default, Debug, Clone)]
+pub struct DefaultSinkVolume(pub f32);
+
 #[derive(Resource, Clone)]
 pub struct PulseAudioResultSender(pub Sender<PulseAudioResult>);
 #[derive(Event)]
@@ -23,6 +27,16 @@ pub struct PulseAudioActionEvent(pub PulseAudioAction);
 
 #[derive(Event)]
 pub struct PulseAudioResultEvent(pub PulseAudioResult);
+
+
+
+
+#[derive(Resource, Default)]
+pub struct AudioManagerState {
+    pub initialized: bool,
+    pub stream_started: bool,
+}
+
 
 #[derive(Debug, Clone)]
 pub enum PulseAudioAction {
@@ -34,6 +48,7 @@ pub enum PulseAudioAction {
     SetDefaultSource(String),
     SetSinkVolumeByName(String, ChannelVolumes),
     SetSourceVolumeByName(String, ChannelVolumes),
+    StreamSinkVolume,
 }
 
 #[derive(Debug)]
@@ -44,6 +59,7 @@ pub enum PulseAudioResult {
     GetDefaultSource(DeviceInfo),
     SetDefaultSink(bool),
     SetDefaultSource(bool),
+    MainSinkVolume(f32),
     Error(ErrorType),
 }
 
@@ -68,12 +84,18 @@ pub struct PulseAudioPlugin;
 impl Plugin for PulseAudioPlugin {
     fn build(&self, app: &mut App) {
         app.insert_non_send_resource(PulseAudioServiceResource { service: None })
+            .insert_resource(AudioManagerState::default())
+            .insert_resource(DefaultSinkVolume::default())
             .add_event::<PulseAudioActionEvent>()
             .add_event::<PulseAudioResultEvent>()
             .add_systems(
                 Startup,
                 (init_pulse_audion_service, setup_pulse_audio_channel),
-            ) // Async task so temp move service result to static
+            )
+            .add_systems(Update, 
+                    start_stream_if_service_ready.after(init_pulse_audion_service),
+            )
+         // Async task so temp move service result to static
             .add_systems(
                 Update,
                 (
@@ -83,6 +105,8 @@ impl Plugin for PulseAudioPlugin {
             );
     }
 }
+
+
 
 /// Initializes the `PulseAudioService` asynchronously on startup.
 ///
@@ -103,6 +127,23 @@ fn init_pulse_audion_service(mut resource: NonSendMut<PulseAudioServiceResource>
         }
         Err(e) => {
             error!("Failed to initialize PulseAudioService: {e}");
+        }
+    }
+}
+
+fn start_stream_if_service_ready(
+    mut state: ResMut<AudioManagerState>,
+    service_res: NonSendMut<PulseAudioServiceResource>,
+    mut events: EventWriter<PulseAudioActionEvent>,
+) {
+    // Only start once, and only when the service is initialized
+    if !state.stream_started {
+        if let Some(service) = &service_res.service {
+            println!("Starting pulse audio stream...");
+            events.write(PulseAudioActionEvent(
+                PulseAudioAction::StreamSinkVolume,
+            ));
+            state.stream_started = true;
         }
     }
 }
@@ -182,10 +223,12 @@ fn handle_pulse_audio_action_events(
                 info!("audio action: get default sink");
                 if let Some(service) = resource_service.service.as_mut() {
                     // let server = &service.server;
+                    let result_sender = sender.0.clone();
+
                     match service.server.get_default_sink() {
                         Ok(sink) => {
                             let result = PulseAudioResult::GetDefaultSink(sink);
-                            if let Err(e) = sender.0.send(result) {
+                            if let Err(e) = result_sender.send(result) {
                                 error!("failed to send get default sink result: {e}");
                             }
                         }
@@ -195,7 +238,7 @@ fn handle_pulse_audio_action_events(
                                 action: PulseAudioAction::GetDefaultSink,
                                 message: format!("Error getting default sink: {e}"),
                             });
-                            if let Err(err) = sender.0.send(result) {
+                            if let Err(err) = result_sender.send(result) {
                                 error!("failed to send error result: {err}");
                             }
                         }
@@ -225,6 +268,37 @@ fn handle_pulse_audio_action_events(
                         }
                     }
                 }
+            }
+            PulseAudioAction::StreamSinkVolume => {
+                info!("audio action: stream sink volume");
+                  if let Some(service) = resource_service.service.as_mut() {
+                    let result_sender = sender.0.clone();
+
+                    match service.server.get_default_sink() {
+                        Ok(sink) => {
+
+                            let avg = sink.volume.avg();
+                            let value = avg.0 as f32 / 65536.0 * 100.0;
+
+                            let result = PulseAudioResult::MainSinkVolume(value);
+                            
+                            if let Err(e) = result_sender.send(result) {
+                                error!("failed to send get default sink volume result: {e}");
+                            }
+                        }
+                        Err(e) => {
+                            error!("error getting default sink: {e}");
+                            let result = PulseAudioResult::Error(ErrorType::ActionFailed {
+                                action: PulseAudioAction::GetDefaultSink,
+                                message: format!("Error getting default sink - volume : {e}"),
+                            });
+                            if let Err(err) = result_sender.send(result) {
+                                error!("failed to send error result for volume : {err}");
+                            }
+                        }
+                    }
+                }
+
             }
             PulseAudioAction::SetDefaultSink(_) => {
                 info!("audio action: set default sink");
@@ -263,10 +337,19 @@ fn handle_pulse_audio_action_events(
 fn poll_pulse_audio_action_result_events(
     mut pulse_audio_result_event_writer: EventWriter<PulseAudioResultEvent>,
     event_receiver: ResMut<PulseAudioResultReceiver>,
+    mut default_sink_volume: ResMut<DefaultSinkVolume>,
 ) {
     if let Ok(receiver) = event_receiver.receiver.lock() {
         while let Ok(event) = receiver.try_recv() {
-            pulse_audio_result_event_writer.write(PulseAudioResultEvent(event));
+            match event {
+                PulseAudioResult::MainSinkVolume(volume) => {
+                    info!("pulse audio main sink volume updated: {:?}", volume);
+                    default_sink_volume.0 = volume;
+                }
+                _ => {
+                    pulse_audio_result_event_writer.write(PulseAudioResultEvent(event));
+                }
+            }
         }
     } else {
         error!("failed to acquire receiver lock");

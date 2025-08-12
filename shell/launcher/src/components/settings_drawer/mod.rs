@@ -1,11 +1,11 @@
 use crate::{
-    components::{AssetsLoadingState, Clock, get_current_datetime},
+    components::{get_current_datetime, AssetsLoadingState, Clock},
     styled_card::StyledCard,
     utils::{FontAssets, Icon},
     widgets::{
-        LauncherStyledWidgetsPlugin,
         button::{ButtonSize, ButtonVariant, StyledButton},
         slider::StyledSlider,
+        LauncherStyledWidgetsPlugin,
     },
 };
 use bevy::{
@@ -23,11 +23,12 @@ use bevy::{
 };
 use bevy_asset_loader::prelude::*;
 use bevy_core_widgets::{CoreButton, CoreScrollArea};
-use bevy_plugins::bluetooth::{
-    BluetoothAction, BluetoothActionEvent, BluetoothEnabledStatus, ListPairedDevices,
-};
-use bevy_plugins::network_manager::{
-    ActiveNetworkStrength, KnownNetworkList, NetworkAction, NetworkActionEvent, WirelessEnabled,
+use bevy_plugins::{
+    bluetooth::{BluetoothAction, BluetoothActionEvent, BluetoothEnabledStatus, ListPairedDevices},
+    network_manager::{
+        ActiveNetworkStrength, KnownNetworkList, NetworkAction, NetworkActionEvent, WirelessEnabled,
+    },
+    pulse_audio::{DefaultSinkVolume, PulseAudioAction, PulseAudioActionEvent},
 };
 use bevy_styled_widgets::prelude::{StyledText, StyledTextPlugin, ThemeManager, ThemeMode};
 use core::fmt;
@@ -59,6 +60,9 @@ struct BluetoothEntry;
 
 #[derive(Component)]
 pub struct Wireless;
+
+#[derive(Component)]
+pub struct Sound;
 
 #[derive(Component)]
 pub struct AutoRotation;
@@ -146,6 +150,7 @@ impl Plugin for SettingsDrawerPlugin {
                 update_popup_background,
                 animate_background,
                 on_animation_background_completed,
+                // poll_sound_data
             ),
         );
 
@@ -166,6 +171,7 @@ impl Plugin for SettingsDrawerPlugin {
                 update_bluetooth_state,
                 update_microphone_state,
                 update_screen_recording_state,
+                update_volume_state,
             ),
         );
 
@@ -195,6 +201,9 @@ impl Plugin for SettingsDrawerPlugin {
                     .run_if(resource_exists::<FontAssets>),
                 update_screen_recording_state
                     .run_if(resource_changed::<ScreenRecordingEnabled>)
+                    .run_if(resource_exists::<FontAssets>),
+                update_volume_state
+                    .run_if(resource_changed::<DefaultSinkVolume>)
                     .run_if(resource_exists::<FontAssets>),
             ),
         );
@@ -245,7 +254,6 @@ fn update_wireless_state(
     mut query: Query<&mut StyledButton, With<Wireless>>,
     wifi_state: Res<WirelessEnabled>,
     font_assets: Res<FontAssets>,
-    mut event_writer: EventWriter<NetworkActionEvent>,
 ) {
     for mut styled_button in &mut query {
         info!(
@@ -295,7 +303,6 @@ fn update_wireless_list_state(
                         println!("Wireless entry clicked : {:?} ", wireless_clone);
 
                         if !wireless_clone.is_active {
-
                             event_writer.write(NetworkActionEvent(
                                 NetworkAction::ConnectToSavedNetwork(wireless_clone.ssid.clone()),
                             ));
@@ -438,6 +445,18 @@ fn update_airplane_mode_state(
     }
 }
 
+fn update_volume_state(
+    mut query: Query<&mut StyledSlider, With<Sound>>,
+    volume: Res<DefaultSinkVolume>,
+    // font_assets: Res<FontAssets>,
+) {
+    info!("DefaultSinkVolume is updated Settings drawer :{:?}", volume);
+    for mut styled_slider in &mut query {
+        println!("DefaultSinkVolume is updated Settings drawer UI volume :{:?}", volume);
+        styled_slider.value = volume.0;
+    }
+}
+
 // pub fn run_settings_drawer() {
 //     App::new()
 //         .insert_resource(ThemeManager::default())
@@ -570,10 +589,13 @@ fn toggle_wireless(
     event_writer.write(NetworkActionEvent(NetworkAction::ToggleWifi(enabled.0)));
 }
 
-fn change_sound_volume() {
-    // fn change_sound_volume(mut volume: ResMut<SoundVolume>) {
-    // volume.0 = volume.0 + 0.1;
-    // event_writer.write(PulseAudioActionEvent(PulseAudioAction::GetDefaultSink));
+fn change_sound_volume(
+    mut volume: ResMut<DefaultSinkVolume>,
+    mut event_writer: EventWriter<PulseAudioActionEvent>,
+) {
+    // TODO:
+    // get sink name and set volume
+    // event_writer.write(PulseAudioActionEvent(PulseAudioAction::SetDefaultSink());
 }
 
 fn long_press_wireless(
@@ -888,16 +910,17 @@ fn on_animation_background_completed(
                     },))
                     .with_children(|parent| {
                         // Spawn the settings items
-                        parent.spawn(
+                        parent.spawn((
+                            Sound,
                             StyledSlider::builder()
                                 .icon(sound_low.clone())
                                 .layout(layout_sound.clone())
                                 .max(100.)
                                 .min(0.)
-                                .value(80.)
-                                // .on_change(on_change_sound)
+                                .value(10.)
+                                // .on_change(on_change_sound_volume)
                                 .build(),
-                        );
+                        ));
                         parent.spawn(
                             (StyledSlider::builder()
                                 .icon(brightness_low.clone())
@@ -1327,12 +1350,10 @@ pub fn list_popup(
                                 align_self: AlignSelf::End,
                                 ..default()
                             },
-                            children![
-                                StyledButton::builder()
-                                    .icon(settings_icon.clone())
-                                    .layout(layout_settings.clone())
-                                    .build(),
-                            ]
+                            children![StyledButton::builder()
+                                .icon(settings_icon.clone())
+                                .layout(layout_settings.clone())
+                                .build(),]
                         )
                     ]
                 ),

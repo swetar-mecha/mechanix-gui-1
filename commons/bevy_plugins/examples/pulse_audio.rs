@@ -25,6 +25,15 @@ fn wait_action_result(mut event_reader: EventReader<PulseAudioResultEvent>) {
             PulseAudioResult::Error(error) => {
                 error!("error: {error:?}");
             }
+            PulseAudioResult::GetDefaultSink(result) => {
+                info!("default sink result received: {result:?}");
+            }
+            PulseAudioResult::GetDefaultSource(result) => {
+                info!("default source result received: {result:?}");
+            }
+            PulseAudioResult::DefaultSinkVolume(value) => {
+                info!("stream sink volume {value:?}");
+            }
             _ => {
                 info!("no action");
             }
@@ -121,7 +130,8 @@ fn button_system(
                 match actions {
                     Some(ButtonAction::Wifi) => {
                         println!("Wifi button pressed");
-                        event_writer.write(PulseAudioActionEvent(PulseAudioAction::ListSinks));
+                        // event_writer.write(PulseAudioActionEvent(PulseAudioAction::ListSinks));
+                        event_writer.write(PulseAudioActionEvent(PulseAudioAction::StreamSinkVolume));
                     }
                     _ => {
                         println!("no action");
