@@ -285,14 +285,28 @@ fn update_wireless_list_state(
                 }
             }
 
-            let on_click = commands.register_system(
-                |mut commands: Commands, q_search: Query<Entity, With<WirelessEntry>>| {
-                    println!("Wireless entry clicked");
-                },
-            );
-
-            // Now populate the container with the new wireless entries
             for (i, network) in network_list.0.iter().enumerate() {
+                let wireless_clone = network.clone();
+
+                let on_click = commands.register_system(
+                    move |mut commands: Commands,
+                          q_status_text: Query<&mut StyledText, With<WirelessEntry>>,
+                          mut event_writer: EventWriter<NetworkActionEvent>| {
+                        println!("Wireless entry clicked : {:?} ", wireless_clone);
+
+                        if !wireless_clone.is_active {
+
+                            event_writer.write(NetworkActionEvent(
+                                NetworkAction::ConnectToSavedNetwork(wireless_clone.ssid.clone()),
+                            ));
+                            // // Todo: change status to connecting
+                            // for mut text in q_status_text.iter() {
+                            //     // text.content = DeviceStatus::Connecting.to_string();
+                            // }
+                        }
+                    },
+                );
+
                 commands.entity(container_entity).with_children(|parent| {
                     parent.spawn(wireless_clickable_row(
                         &network.ssid,
@@ -302,11 +316,6 @@ fn update_wireless_list_state(
                         &font_assets,
                         on_click,
                     ));
-
-                    // parent.spawn(divider());
-                    if i != network_list.0.len() - 1 {
-                        parent.spawn(divider());
-                    }
                 });
             }
         }
@@ -339,7 +348,7 @@ fn update_bluetooth_list_state(
 
                 let on_click = commands.register_system(
                     move |mut commands: Commands,
-                            q_status_text: Query<&mut StyledText, With<BluetoothEntry>>,
+                          q_status_text: Query<&mut StyledText, With<BluetoothEntry>>,
                           mut event_writer: EventWriter<BluetoothActionEvent>| {
                         println!("Bluetooth entry clicked : {:?} ", bluetooth_clone);
 
@@ -561,6 +570,12 @@ fn toggle_wireless(
     event_writer.write(NetworkActionEvent(NetworkAction::ToggleWifi(enabled.0)));
 }
 
+fn change_sound_volume() {
+    // fn change_sound_volume(mut volume: ResMut<SoundVolume>) {
+    // volume.0 = volume.0 + 0.1;
+    // event_writer.write(PulseAudioActionEvent(PulseAudioAction::GetDefaultSink));
+}
+
 fn long_press_wireless(
     mut commands: Commands,
     mut q_settings_drawer: Query<Entity, With<SettingsDrawerRoot>>,
@@ -631,6 +646,7 @@ fn on_animation_background_completed(
     let on_toggle_airplane_mode = commands.register_system(toggle_airplane_mode);
     let on_toggle_screen_recording = commands.register_system(toggle_screen_recording);
     let on_toggle_microphone = commands.register_system(toggle_microphone);
+    let on_change_sound_volume = commands.register_system(change_sound_volume);
 
     if font_assets.is_none() {
         return;
@@ -873,21 +889,22 @@ fn on_animation_background_completed(
                     .with_children(|parent| {
                         // Spawn the settings items
                         parent.spawn(
+                            StyledSlider::builder()
+                                .icon(sound_low.clone())
+                                .layout(layout_sound.clone())
+                                .max(100.)
+                                .min(0.)
+                                .value(80.)
+                                // .on_change(on_change_sound)
+                                .build(),
+                        );
+                        parent.spawn(
                             (StyledSlider::builder()
                                 .icon(brightness_low.clone())
                                 .layout(layout_brightness.clone())
                                 .max(100.)
                                 .min(0.)
                                 .value(30.)
-                                .build()),
-                        );
-                        parent.spawn(
-                            (StyledSlider::builder()
-                                .icon(sound_low.clone())
-                                .layout(layout_sound.clone())
-                                .max(100.)
-                                .min(0.)
-                                .value(80.)
                                 .build()),
                         );
                     });
@@ -1372,12 +1389,8 @@ fn wireless_clickable_row(
 ) -> impl Bundle {
     let status = get_device_status(is_active);
 
-    let wireless_icon = get_wireless_icon(
-        is_active,
-        security,
-        active_network_strength,
-        font_assets,
-    );
+    let wireless_icon =
+        get_wireless_icon(is_active, security, active_network_strength, font_assets);
 
     let icon_size = 24.;
 
@@ -1425,8 +1438,7 @@ fn get_wireless_icon(
     strength: u8,
     font_assets: &FontAssets,
 ) -> Handle<Image> {
-
-      let FontAssets {
+    let FontAssets {
         gray_wireless_low,
         gray_wireless_medium,
         gray_wireless_high,
@@ -1445,7 +1457,6 @@ fn get_wireless_icon(
         layout_wireless,
         ..
     } = font_assets.clone();
-
 
     match (is_active, security) {
         (true, "Protected") => match strength {
@@ -1488,7 +1499,6 @@ fn get_device_status(is_active: bool) -> String {
         DeviceStatus::Unknown.to_string()
     }
 }
-
 
 fn bluetooth_clickable_row(
     name: &str,
