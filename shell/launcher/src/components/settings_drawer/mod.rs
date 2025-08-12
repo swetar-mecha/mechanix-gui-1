@@ -298,6 +298,7 @@ fn update_wireless_list_state(
                         &network.ssid,
                         network.is_active,
                         network.signal_strength,
+                        &network.security,
                         &font_assets,
                         on_click,
                     ));
@@ -1365,63 +1366,19 @@ fn wireless_clickable_row(
     name: &str,
     is_active: bool,
     active_network_strength: u8,
+    security: &str,
     font_assets: &FontAssets,
     on_click: SystemId,
 ) -> impl Bundle {
-    let status: String = if is_active {
-        DeviceStatus::Connected
-    } else {
-        DeviceStatus::Unknown
-    }
-    .to_string();
+    let status = get_device_status(is_active);
 
-    let FontAssets {
-        gray_wireless_low,
-        gray_wireless_medium,
-        gray_wireless_high,
-        gray_wireless_warning,
+    let wireless_icon = get_wireless_icon(
+        is_active,
+        security,
+        active_network_strength,
+        font_assets,
+    );
 
-        blue_wireless_low,
-        blue_wireless_medium,
-        blue_wireless_high,
-        blue_wireless_none,
-        settings_icon,
-        layout_wireless,
-        layout_settings,
-        ..
-    } = font_assets.clone();
-
-    let wireless_icon = match active_network_strength {
-        0..=20 => {
-            if is_active {
-                blue_wireless_low
-            } else {
-                gray_wireless_low
-            }
-        }
-        21..=50 => {
-            if is_active {
-                blue_wireless_low
-            } else {
-                gray_wireless_low
-            }
-        }
-        51..=75 => {
-            if is_active {
-                blue_wireless_medium
-            } else {
-                gray_wireless_medium
-            }
-        }
-        76..=100 => {
-            if is_active {
-                blue_wireless_high
-            } else {
-                gray_wireless_high
-            }
-        }
-        _ => unreachable!(),
-    };
     let icon_size = 24.;
 
     (
@@ -1440,7 +1397,7 @@ fn wireless_clickable_row(
         children![
             ImageNode::from_atlas_image(
                 wireless_icon.clone(),
-                TextureAtlas::from(layout_wireless.clone()),
+                TextureAtlas::from(font_assets.layout_wireless.clone()),
             ),
             (
                 Node {
@@ -1457,10 +1414,81 @@ fn wireless_clickable_row(
                 },
                 children![(StyledText::new(name),)]
             ),
-            StyledText::new(status)
+            StyledText::new(status),
         ],
     )
 }
+
+fn get_wireless_icon(
+    is_active: bool,
+    security: &str,
+    strength: u8,
+    font_assets: &FontAssets,
+) -> Handle<Image> {
+
+      let FontAssets {
+        gray_wireless_low,
+        gray_wireless_medium,
+        gray_wireless_high,
+
+        gray_secured_wireless_low,
+        gray_secured_wireless_medium,
+        gray_secured_wireless_high,
+
+        blue_wireless_low,
+        blue_wireless_medium,
+        blue_wireless_high,
+
+        blue_secured_wireless_low,
+        blue_secured_wireless_medium,
+        blue_secured_wireless_high,
+        layout_wireless,
+        ..
+    } = font_assets.clone();
+
+
+    match (is_active, security) {
+        (true, "Protected") => match strength {
+            (0..=20) => blue_secured_wireless_low,
+            (21..=50) => blue_secured_wireless_low,
+            (51..=75) => blue_secured_wireless_medium,
+            (76..=100) => blue_secured_wireless_high,
+            _ => unreachable!(),
+        },
+        (true, "Open") => match strength {
+            (0..=20) => blue_wireless_low,
+            (21..=50) => blue_wireless_low,
+            (51..=75) => blue_wireless_medium,
+            (76..=100) => blue_wireless_high,
+            _ => unreachable!(),
+        },
+        (false, "Protected") => match strength {
+            (0..=20) => gray_secured_wireless_low,
+            (21..=50) => gray_secured_wireless_low,
+            (51..=75) => gray_secured_wireless_medium,
+            (76..=100) => gray_secured_wireless_high,
+            _ => unreachable!(),
+        },
+        (false, "Open") => match strength {
+            (0..=20) => gray_wireless_low,
+            (21..=50) => gray_wireless_low,
+            (51..=75) => gray_wireless_medium,
+            (76..=100) => gray_wireless_high,
+            _ => unreachable!(),
+        },
+        _ => unreachable!(),
+    }
+}
+
+// Function to create the status string based on is_active
+fn get_device_status(is_active: bool) -> String {
+    if is_active {
+        DeviceStatus::Connected.to_string()
+    } else {
+        DeviceStatus::Unknown.to_string()
+    }
+}
+
 
 fn bluetooth_clickable_row(
     name: &str,

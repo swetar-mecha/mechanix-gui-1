@@ -129,6 +129,23 @@ pub struct FontAssets {
     #[asset(key = "image.blue_wireless_none")]
     pub blue_wireless_none: Handle<Image>, // icons/wireless_none.png
 
+
+    #[asset(key = "image.blue_secured_wireless_high")]
+    pub blue_secured_wireless_high: Handle<Image>, // icons/blue_secured_wireless_high.png
+    #[asset(key = "image.blue_secured_wireless_low")]
+    pub blue_secured_wireless_low: Handle<Image>, // icons/blue_secured_wireless_low.png
+    #[asset(key = "image.blue_secured_wireless_medium")]
+    pub blue_secured_wireless_medium: Handle<Image>, // icons/blue_secured_wireless_medium.png
+
+
+    #[asset(key = "image.gray_secured_wireless_high")]
+    pub gray_secured_wireless_high: Handle<Image>, // icons/gray_secured_wireless_high.png
+    #[asset(key = "image.gray_secured_wireless_low")]
+    pub gray_secured_wireless_low: Handle<Image>, // icons/gray_secured_wireless_low.png
+    #[asset(key = "image.gray_secured_wireless_medium")]
+    pub gray_secured_wireless_medium: Handle<Image>, // icons/gray_secured_wireless_medium.png
+
+
     #[asset(key = "image.extend_screen_none")]
     pub extend_screen_none: Handle<Image>, // icons/wireless_on.png
     #[asset(key = "image.settings_icon")]

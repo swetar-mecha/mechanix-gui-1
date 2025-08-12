@@ -110,7 +110,9 @@ fn button_system(
                     Some(ButtonAction::Bluetooth) => {
                         println!("button pressed");
                         event_writer
-                            .write(BluetoothActionEvent(BluetoothAction::ToggleBluetooth(true)));
+                            .write(BluetoothActionEvent(BluetoothAction::ListAvailableDevices));
+                            // .write(BluetoothActionEvent(BluetoothAction::ToggleBluetooth(true)));
+
                     }
                     _ => {
                         println!("no action");

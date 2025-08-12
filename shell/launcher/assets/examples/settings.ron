@@ -301,6 +301,32 @@
         path: "icons/blue_wireless_none.png",
     ),
 
+    
+    
+    "image.blue_secured_wireless_high": File (
+        path: "icons/blue_secured_wireless_high.png",
+    ),
+
+    "image.blue_secured_wireless_low": File (
+        path: "icons/blue_secured_wireless_low.png",
+    ),
+
+    "image.blue_secured_wireless_medium": File (
+        path: "icons/blue_secured_wireless_medium.png",
+    ),
+
+    "image.gray_secured_wireless_high": File (
+        path: "icons/gray_secured_wireless_high.png",
+    ),
+
+    "image.gray_secured_wireless_low": File (
+        path: "icons/gray_secured_wireless_low.png",
+    ),
+
+    "image.gray_secured_wireless_medium": File (
+        path: "icons/gray_secured_wireless_medium.png",
+    ),
+
 
 
 
