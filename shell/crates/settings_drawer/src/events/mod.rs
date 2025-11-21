@@ -8,3 +8,13 @@ pub enum AppEvents {
     BluetoothEnabled { enabled: bool },
     BluetoothConnectionStatus { connected: bool },
 }
+
+#[derive(Debug)]
+pub enum NmEvents {
+    WirelessToggle { enabled: bool },
+}
+
+#[derive(Debug)]
+pub enum BtEvents {
+    BluetoothToggle { enabled: bool },
+}

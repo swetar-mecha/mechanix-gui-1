@@ -60,3 +60,28 @@ pub async fn sync_connected_network(mut tx: mpsc::Sender<AppEvents>) {
         }
     };
 }
+
+pub async fn handle_wireless_toggle(mut nm_rx: mpsc::Receiver<NmEvents>) {
+     let network_manager = match NetworkManagerService::new().await {
+        Ok(nm) => nm,
+        Err(e) => {
+            eprintln!("Failed to create NetworkManagerService: {}", e);
+            return;
+        }
+    };
+
+    loop {
+        select! {
+            event = nm_rx.next() => {
+                if let Some(event) = event  {
+                    match event {
+                            NmEvents::WirelessToggle { enabled } => {
+                            println!("NmEvents::WirelessToggle {}", enabled);
+                            let _ = network_manager.toggle_wireless(enabled).await;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

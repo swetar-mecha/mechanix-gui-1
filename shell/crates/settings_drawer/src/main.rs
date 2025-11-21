@@ -19,6 +19,7 @@ fn main() {
             },
             |_window, cx| {
                 let (app_channel_tx, mut app_channel_rx) = mpsc::channel::<AppEvents>(120);
+                let (nm_tx, nm_rx) = mpsc::channel::<NmEvents>(128);
                 let executor = cx.background_executor();
 
                 executor
@@ -29,6 +30,9 @@ fn main() {
                     .detach();
                 executor
                     .spawn(sync_connected_network(app_channel_tx.clone()))
+                    .detach();
+                 executor
+                    .spawn(handle_wireless_toggle(nm_rx))
                     .detach();
 
                 executor
@@ -77,7 +81,7 @@ fn main() {
                     })
                     .detach();
 
-                    SettingsDrawer::new(cx)
+                    SettingsDrawer::new(cx, nm_tx.clone())
                 })
             },
         )

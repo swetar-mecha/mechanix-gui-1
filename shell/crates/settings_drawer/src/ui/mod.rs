@@ -8,6 +8,7 @@ use gpui::*;
 use icon::IconName;
 use networkmanager::interfaces::wireless::WirelessNetworkInfo;
 use widgets::IconButton;
+use crate::events::NmEvents;
 
 pub enum PowerMode {
     High,
@@ -28,6 +29,8 @@ pub struct BluetoothDetails {
 }
 
 pub struct SettingsDrawer {
+    pub nm_tx: mpsc::Sender<NmEvents>,
+
     pub settings_active: bool,
     pub battery_percent: u8,
     pub open_power_options: bool,
@@ -53,7 +56,7 @@ pub struct SettingsDrawer {
 }
 
 impl SettingsDrawer {
-    pub fn new(cx: &mut Context<Self>) -> Self {
+    pub fn new(cx: &mut Context<Self>, nm_tx: mpsc::Sender<NmEvents>) -> Self {
         
         let brightness_slider = cx.new(|_| SliderState::new());
         let b_subscription =
@@ -468,9 +471,27 @@ impl Render for SettingsDrawer {
                             .active(self.wireless_details.enabled)
                             .active_bg_color(rgb(0x202020))
                             .label(connected_network)
-                            .on_click(cx.listener(|_, _, _, _| {
-                                println!("wireless clicked");
-                            })),
+                             .on_click(cx.listener(
+                                |this: &mut SettingsDrawer,
+                                 _event: &ClickEvent,
+                                 _window: &mut Window,
+                                 cx: &mut Context<Self>| {
+                                    let mut nm_tx = this.nm_tx.clone();
+                                    let is_enable = this.wireless_details.enabled;
+                                    cx.background_executor()
+                                        .spawn(async move {
+                                            let _ = nm_tx
+                                                .send(NmEvents::WirelessToggle {
+                                                    enabled: !is_enable,
+                                                })
+                                                .await;
+                                        })
+                                        .detach();
+                                },
+                            )),
+                            // .on_click(cx.listener(|_, _, _, _| {
+                            //     println!("wireless clicked");
+                            // })),
                     )
                     .child(
                         IconButton::new("id_bluetooth")
