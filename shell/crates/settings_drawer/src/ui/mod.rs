@@ -6,6 +6,7 @@ use crate::ui::{
 };
 use gpui::*;
 use icon::IconName;
+use networkmanager::interfaces::wireless::WirelessNetworkInfo;
 use widgets::IconButton;
 
 pub enum PowerMode {
@@ -15,14 +16,14 @@ pub enum PowerMode {
 }
 
 pub struct WirelessDetails {
-    pub enalble: bool,
-    pub icon: IconName,
-    pub connected_wifi: Option<String>,
+    pub enabled: bool,
+    pub strength: u8,
+    pub connected_network: Option<WirelessNetworkInfo>,
 }
 
 pub struct BluetoothDetails {
-    pub enalble: bool,
-    pub icon: IconName,
+    pub enabled: bool,
+    pub connected: bool,
     pub connected_device: Option<String>,
 }
 
@@ -53,6 +54,7 @@ pub struct SettingsDrawer {
 
 impl SettingsDrawer {
     pub fn new(cx: &mut Context<Self>) -> Self {
+        
         let brightness_slider = cx.new(|_| SliderState::new());
         let b_subscription =
             cx.subscribe(&brightness_slider, |this, _, event: &SliderEvent, cx| {
@@ -87,13 +89,13 @@ impl SettingsDrawer {
             mincrophone_recoding: false,
             screen_recording: false,
             wireless_details: WirelessDetails {
-                enalble: true,
-                icon: IconName::WirelessHigh,
-                connected_wifi: Some("Office Wifi 1".to_string()),
+                enabled: true,
+                strength: 0,
+                connected_network: None,
             },
             bluetooth_details: BluetoothDetails {
-                enalble: false,
-                icon: IconName::BluetoothOff,
+                enabled: false,
+                connected: false,
                 connected_device: None,
             },
             open_terminal: false,
@@ -109,6 +111,29 @@ impl SettingsDrawer {
 
 impl Render for SettingsDrawer {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+
+
+         let wireless_icon = match self.wireless_details.enabled {
+            true => match self.wireless_details.strength {
+                0..=20 => IconName::WirelessLow,
+                21..=50 => IconName::WirelessMedium,
+                51..=75 => IconName::WirelessMedium,
+                76..=100 => IconName::WirelessHigh,
+                _ => IconName::WirelessOn,
+            },
+            false => IconName::WirelessOff,
+        };
+        let connected_network = self.wireless_details.connected_network.clone().map(|s|s.ssid).unwrap_or_else(|| "".to_string());
+        println!("Connected network: {:?}", connected_network);
+
+        let bluetooth_icon = match self.bluetooth_details.enabled {
+            true => match self.bluetooth_details.connected {
+                true => IconName::BluetoothConnected,
+                false => IconName::BluetoothOn,
+            },
+            false => IconName::BluetoothOff,
+        };
+
         let rotation_icon = if self.rotation_on {
             IconName::RotationOn
         } else {
@@ -437,22 +462,22 @@ impl Render for SettingsDrawer {
                     .rounded(px(4.))
                     .child(
                         IconButton::new("id_wireless")
-                            .icon(self.wireless_details.icon.clone())
+                            .icon(wireless_icon)
                             .icon_color(rgb(0x4D4D4D)) // changes as per wireless state
                             .size((px(104.), px(104.)))
-                            .active(self.wireless_details.enalble)
+                            .active(self.wireless_details.enabled)
                             .active_bg_color(rgb(0x202020))
-                            .label("Office wifi 1")
+                            .label(connected_network)
                             .on_click(cx.listener(|_, _, _, _| {
                                 println!("wireless clicked");
                             })),
                     )
                     .child(
                         IconButton::new("id_bluetooth")
-                            .icon(self.bluetooth_details.icon.clone())
+                            .icon(bluetooth_icon)
                             .size((px(104.), px(104.)))
                             .label("OFF")
-                            .active(self.bluetooth_details.enalble)
+                            .active(self.bluetooth_details.enabled)
                             .active_bg_color(rgb(0x202020))
                             .on_click(cx.listener(|_, _, _, _| {
                                 println!("bluetooth clicked");
