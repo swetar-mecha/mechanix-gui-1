@@ -1,5 +1,5 @@
-use crate::events::AppEvents;
-use futures::{SinkExt, channel::mpsc};
+use crate::events::{AppEvents, NmEvents};
+use futures::{SinkExt, StreamExt, channel::mpsc, select};
 use networkmanager::service::NetworkManagerService;
 
 pub async fn sync_network_status(mut tx: mpsc::Sender<AppEvents>) {
@@ -76,7 +76,6 @@ pub async fn handle_wireless_toggle(mut nm_rx: mpsc::Receiver<NmEvents>) {
                 if let Some(event) = event  {
                     match event {
                             NmEvents::WirelessToggle { enabled } => {
-                            println!("NmEvents::WirelessToggle {}", enabled);
                             let _ = network_manager.toggle_wireless(enabled).await;
                         }
                     }

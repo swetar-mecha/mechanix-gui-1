@@ -6,7 +6,8 @@ pub enum AppEvents {
     WirelessStrength { strength: u8 },
     ConnectedNetwork { network: Option<WirelessNetworkInfo> },
     BluetoothEnabled { enabled: bool },
-    BluetoothConnectionStatus { connected: bool },
+    BluetoothDevices { count: u8 },
+
 }
 
 #[derive(Debug)]

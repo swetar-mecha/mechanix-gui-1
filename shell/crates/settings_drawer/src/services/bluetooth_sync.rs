@@ -1,6 +1,6 @@
-use crate::events::AppEvents;
+use crate::events::{AppEvents, BtEvents};
 use bluez::service::BluetoothService;
-use futures::{SinkExt, channel::mpsc};
+use futures::{SinkExt, StreamExt, channel::mpsc, select};
 
 pub async fn sync_bluetooth_status(mut tx: mpsc::Sender<AppEvents>) {
     let bluetooth_manager = match BluetoothService::new().await {
@@ -27,16 +27,40 @@ pub async fn sync_bluetooth_connected_status(mut tx: mpsc::Sender<AppEvents>) {
         }
     };
 
-    let connected_devices_count = match bluetooth_manager.get_connected_devices().await {
+    let count = match bluetooth_manager.get_connected_devices().await {
         Ok(r) => r.len(),
         Err(e) => {
             eprintln!("Failed to get connected devices: {}", e);
             return;
         }
     };
-    let connected = connected_devices_count > 0;
+    println!("Connected bluetooth devices: {:?}", count);
 
     let _ = tx
-        .send(AppEvents::BluetoothConnectionStatus { connected })
+        .send(AppEvents::BluetoothDevices { count: count as u8 })
         .await;
+}
+
+pub async fn handle_bluetooth_toggle(mut bt_rx: mpsc::Receiver<BtEvents>) {
+    let bluetooth_manager = match BluetoothService::new().await {
+        Ok(bluetooth_manager) => bluetooth_manager,
+        Err(e) => {
+            eprintln!("Failed to create BluetoothService: {}", e);
+            return;
+        }
+    };
+
+    loop {
+        select! {
+            event = bt_rx.next() => {
+                if let Some(event) = event  {
+                    match event {
+                            BtEvents::BluetoothToggle { enabled } => {
+                            let _ = bluetooth_manager.toggle_bluetooth(enabled).await;
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
