@@ -12,7 +12,7 @@ use crate::{
 const ROW_HEIGHT: f32 = 60.0;
 
 #[derive(Debug, Clone, PartialEq, Default)]
-enum ExtendedType {
+pub enum ExtendedType {
     #[default]
     ExtendedDetected,
     MirrorScreen,
@@ -28,40 +28,60 @@ struct ExtendOption {
 }
 
 pub struct ExtendScreenOptions {
-    pub title: String,
+    extend_options: Vec<ExtendOption>,
+    on_option_click: Option<Box<dyn Fn(ExtendedType) + 'static>>,
+    on_settings_click: Option<Box<dyn Fn() + 'static>>,
 }
 
 impl ExtendScreenOptions {
-    pub fn new(title: String) -> Self {
-        Self { title }
+    pub fn new() -> Self {
+        Self {
+            extend_options: vec![
+                ExtendOption {
+                    text: "Extended detected".to_string(),
+                    extend_type: ExtendedType::ExtendedDetected,
+                    is_active: true,
+                },
+                ExtendOption {
+                    text: "Mirror screen".to_string(),
+                    extend_type: ExtendedType::MirrorScreen,
+                    is_active: false,
+                },
+                ExtendOption {
+                    text: "Extended only".to_string(),
+                    extend_type: ExtendedType::ExtendedOnly,
+                    is_active: false,
+                },
+                ExtendOption {
+                    text: "Second screen".to_string(),
+                    extend_type: ExtendedType::SecondScreen,
+                    is_active: false,
+                },
+            ],
+            on_option_click: None,
+            on_settings_click: None,
+        }
+    }
+
+    pub fn on_option_click<F>(mut self, f: F) -> Self
+    where
+        F: Fn(ExtendedType) + 'static,
+    {
+        self.on_option_click = Some(Box::new(f));
+        self
+    }
+
+    pub fn on_settings_click<F>(mut self, f: F) -> Self
+    where
+        F: Fn() + 'static,
+    {
+        self.on_settings_click = Some(Box::new(f));
+        self
     }
 }
 
 impl Render for ExtendScreenOptions {
     fn render(&mut self, _window: &mut Window, ctx: &mut Context<Self>) -> impl IntoElement {
-        let extend_options = vec![
-            ExtendOption {
-                text: "Extended detected".to_string(),
-                extend_type: ExtendedType::ExtendedDetected,
-                is_active: true,
-            },
-            ExtendOption {
-                text: "Mirror screen".to_string(),
-                extend_type: ExtendedType::MirrorScreen,
-                is_active: false,
-            },
-            ExtendOption {
-                text: "Extended only".to_string(),
-                extend_type: ExtendedType::ExtendedOnly,
-                is_active: false,
-            },
-            ExtendOption {
-                text: "Second screen".to_string(),
-                extend_type: ExtendedType::SecondScreen,
-                is_active: false,
-            },
-        ];
-
         div()
             .flex()
             .flex_col()
@@ -88,11 +108,11 @@ impl Render for ExtendScreenOptions {
                             .text_size(px(20.))
                             .font_weight(FontWeight::SEMIBOLD)
                             .text_color(rgb(DARK_NEUTRAL_0))
-                            .child(self.title.clone()),
+                            .child("Extended Screen"),
                     ),
             )
             .child(div().flex().flex_col().flex_1().relative().children(
-                extend_options.iter().enumerate().map(|(idx, ex)| {
+                self.extend_options.iter().enumerate().map(|(idx, ex)| {
                     let is_active = ex.is_active;
 
                     let icon_color = if is_active {

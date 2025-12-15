@@ -12,6 +12,7 @@ pub const DARK_NEUTRAL_800: u32 = 0x222222;
 
 pub const AMBER_600: u32 = 0xC67600;
 pub const AMBER_900: u32 = 0x804B00;
+pub const AMBER_800: u32 = 0x945700;
 pub const AMBER_1000: u32 = 0x5F3600;
 
 pub const BRIGHTNESS_ICON_COLOR: u32 = 0xC67600;

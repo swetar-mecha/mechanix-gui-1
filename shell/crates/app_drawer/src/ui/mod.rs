@@ -505,6 +505,7 @@ impl Render for AppDrawer {
                             .pb(px(28.))
                             .pl(px(20.))
                             .pr(px(20.))
+                            // .child("THIS IS BOTTOM SHEET PANEL")
 
                             // Prevents click from reaching background
                             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
