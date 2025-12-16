@@ -1,12 +1,9 @@
-use futures::{SinkExt, channel::mpsc};
 use gpui::*;
+use std::rc::Rc;
 
 use crate::{
     prelude::*,
-    ui::{
-        icon::{Icon, IconName},
-        widgets::IconButton,
-    },
+    ui::icon::{Icon, IconName},
 };
 
 const ROW_HEIGHT: f32 = 60.0;
@@ -27,69 +24,49 @@ struct ExtendOption {
     is_active: bool,
 }
 
-pub struct ExtendScreenOptions {
-    extend_options: Vec<ExtendOption>,
-    on_option_click: Option<Box<dyn Fn(ExtendedType) + 'static>>,
-    on_settings_click: Option<Box<dyn Fn() + 'static>>,
-}
-
-impl ExtendScreenOptions {
-    pub fn new() -> Self {
-        Self {
-            extend_options: vec![
-                ExtendOption {
-                    text: "Extended detected".to_string(),
-                    extend_type: ExtendedType::ExtendedDetected,
-                    is_active: true,
-                },
-                ExtendOption {
-                    text: "Mirror screen".to_string(),
-                    extend_type: ExtendedType::MirrorScreen,
-                    is_active: false,
-                },
-                ExtendOption {
-                    text: "Extended only".to_string(),
-                    extend_type: ExtendedType::ExtendedOnly,
-                    is_active: false,
-                },
-                ExtendOption {
-                    text: "Second screen".to_string(),
-                    extend_type: ExtendedType::SecondScreen,
-                    is_active: false,
-                },
-            ],
-            on_option_click: None,
-            on_settings_click: None,
-        }
+impl SettingsDrawer {
+    // settings drawer
+    fn extended_screens(&self) -> Vec<ExtendOption> {
+        // extended screen
+        let extend_options = vec![
+            ExtendOption {
+                text: "Extended detected".to_string(),
+                extend_type: ExtendedType::ExtendedDetected,
+                is_active: true,
+            },
+            ExtendOption {
+                text: "Mirror screen".to_string(),
+                extend_type: ExtendedType::MirrorScreen,
+                is_active: false,
+            },
+            ExtendOption {
+                text: "Extended only".to_string(),
+                extend_type: ExtendedType::ExtendedOnly,
+                is_active: false,
+            },
+            ExtendOption {
+                text: "Second screen".to_string(),
+                extend_type: ExtendedType::SecondScreen,
+                is_active: false,
+            },
+        ];
+        extend_options
     }
 
-    pub fn on_option_click<F>(mut self, f: F) -> Self
-    where
-        F: Fn(ExtendedType) + 'static,
-    {
-        self.on_option_click = Some(Box::new(f));
-        self
-    }
-
-    pub fn on_settings_click<F>(mut self, f: F) -> Self
-    where
-        F: Fn() + 'static,
-    {
-        self.on_settings_click = Some(Box::new(f));
-        self
-    }
-}
-
-impl Render for ExtendScreenOptions {
-    fn render(&mut self, _window: &mut Window, ctx: &mut Context<Self>) -> impl IntoElement {
+    pub fn render_extended_screen_options(
+        &self,
+        cx: &mut gpui::Context<SettingsDrawer>,
+    ) -> AnyElement {
+        let extend_options = self.extended_screens();
         div()
             .flex()
             .flex_col()
+            .w_full()
+            .h_full()
             .bg(rgb(DARK_NEUTRAL_900))
-            .size_full()
-            .border_1()
             .rounded_xl()
-            .border_color(rgb(AMBER_900))
+            .border_1()
+            .border_color(rgb(AMBER_800))
             .child(
                 // Header
                 div()
@@ -100,7 +77,6 @@ impl Render for ExtendScreenOptions {
                     .w_full()
                     .p_4()
                     .h(px(ROW_HEIGHT))
-                    .border_b_1()
                     .bg(rgb(DARK_NEUTRAL_800))
                     .flex_shrink_0()
                     .child(
@@ -112,7 +88,7 @@ impl Render for ExtendScreenOptions {
                     ),
             )
             .child(div().flex().flex_col().flex_1().relative().children(
-                self.extend_options.iter().enumerate().map(|(idx, ex)| {
+                extend_options.iter().enumerate().map(|(idx, ex)| {
                     let is_active = ex.is_active;
 
                     let icon_color = if is_active {
@@ -120,14 +96,13 @@ impl Render for ExtendScreenOptions {
                     } else {
                         rgb(DARK_NEUTRAL_0)
                     };
-                    let mut icon = IconName::ExtendedDetected;
 
-                    match ex.extend_type {
-                        ExtendedType::ExtendedDetected => icon = IconName::ExtendedDetected,
-                        ExtendedType::MirrorScreen => icon = IconName::MirrorScreen,
-                        ExtendedType::ExtendedOnly => icon = IconName::ExtendedOnly,
-                        ExtendedType::SecondScreen => icon = IconName::SecondScreen,
-                    }
+                    let icon = match ex.extend_type {
+                        ExtendedType::ExtendedDetected => IconName::ExtendedDetected,
+                        ExtendedType::MirrorScreen => IconName::MirrorScreen,
+                        ExtendedType::ExtendedOnly => IconName::ExtendedOnly,
+                        ExtendedType::SecondScreen => IconName::SecondScreen,
+                    };
 
                     let connect_div = div().child(
                         Icon::new(IconName::ConnectedIcon)
@@ -143,11 +118,7 @@ impl Render for ExtendScreenOptions {
                             .justify_between()
                             .h(px(60.))
                             .px_4()
-                            .bg(if is_active {
-                                rgba(AMBER_600_10)
-                            } else {
-                                rgba(AMBER_900)
-                            })
+                            .bg(rgba(AMBER_600_10))
                             .border_y_1()
                             .border_color(rgb(AMBER_900))
                             .child(
@@ -171,7 +142,7 @@ impl Render for ExtendScreenOptions {
                                             .child(ex.text.clone()),
                                     ),
                             )
-                            .child(if ex.is_active { connect_div } else { div() })
+                            .child(connect_div)
                     } else {
                         div()
                             .id(("mode", idx))
@@ -180,6 +151,7 @@ impl Render for ExtendScreenOptions {
                             .justify_between()
                             .h(px(60.))
                             .px_4()
+                            .hover(|style| style.bg(rgba(AMBER_600_10)))
                             .child(
                                 div()
                                     .flex()
@@ -201,7 +173,7 @@ impl Render for ExtendScreenOptions {
                                             .child(ex.text.clone()),
                                     ),
                             )
-                            .on_click(ctx.listener(move |_, _, _, _| {
+                            .on_click(cx.listener(move |_, _, _, _| {
                                 println!("option clicked...");
                             }))
                     };
@@ -222,6 +194,7 @@ impl Render for ExtendScreenOptions {
                     .h(px(ROW_HEIGHT))
                     .p_4()
                     .flex_shrink_0()
+                    .hover(|style| style.bg(rgba(AMBER_600_10)))
                     .child(
                         Icon::new(IconName::Settings)
                             .size((px(28.), px(28.)))
@@ -235,9 +208,10 @@ impl Render for ExtendScreenOptions {
                             .text_color(rgb(AMBER_600))
                             .child("Settings"),
                     )
-                    .on_click(ctx.listener(|_, _, _, _| {
-                        println!("settings clicked");
+                    .on_click(cx.listener(move |_, _, _, _| {
+                        println!("option clicked...");
                     })),
             )
+            .into_any()
     }
 }

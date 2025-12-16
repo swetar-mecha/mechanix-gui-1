@@ -10,5 +10,4 @@ pub use performance_modal::PerformanceWindow;
 pub use wireless_modal::WirelessWindow;
 
 pub use display_modal::DisplayWindow;
-pub use extended_screen::ExtendScreenOptions;
 pub use sound_modal::SoundWindow;
