@@ -5,9 +5,6 @@ use upower::interfaces::device::BatteryState;
 
 #[derive(Debug)]
 pub enum AppEvents {
-    BatteryStateChanged {
-        state: BatteryState,
-    },
     BatteryPercentageChanged {
         value: u8,
     },
@@ -22,7 +19,7 @@ pub enum AppEvents {
     },
     AccessPointEvent {
         event: AccessPointEvent,
-    }, 
+    },
     BluetoothEnabled {
         enabled: bool,
     },

@@ -76,12 +76,6 @@ fn main() {
                         loop {
                             select! {
                                 // battery events
-                                battery_state = battery_status_stream.next() => {
-                                    if let Some(state) = battery_state {
-                                        let _ = app_channel_tx.send(AppEvents::BatteryStateChanged { state }).await;
-                                    }
-                                },
-
                                 battery_percentage = battery_percentage_stream.next() => {
                                     if let Some(percentage) = battery_percentage {
                                         let value = percentage as u8;
@@ -236,12 +230,6 @@ fn main() {
                     cx.spawn(async move |app, cx| {
                         while let Some(event) = app_channel_rx.next().await {
                             match event {
-                                AppEvents::BatteryStateChanged { state } => {
-                                    let _ = app.update(cx, |this: &mut SettingsDrawer, cx| {
-                                        this.battery_state = state;
-                                        cx.notify();
-                                    });
-                                }
                                 AppEvents::BatteryPercentageChanged { value } => {
                                     let _ = app.update(cx, |this: &mut SettingsDrawer, cx| {
                                         this.battery_percent = value;

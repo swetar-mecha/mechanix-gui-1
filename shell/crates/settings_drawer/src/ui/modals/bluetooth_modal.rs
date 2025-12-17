@@ -1,43 +1,18 @@
-use bluez::interfaces::device::BluetoothDevice;
-use futures::{SinkExt, channel::mpsc};
+use futures::SinkExt;
 use gpui::*;
 
-use crate::{
-    events::BtEvents, get_bluetooth_icon, prelude::*, ui::icon::{Icon, IconName}
+use crate::{ get_bluetooth_icon,  prelude::*, ui::icon::{Icon, IconName}
 };
 
-const ROW_HEIGHT: f32 = 60.0;
 const HEADER_HEIGHT: f32 = 60.0;
 const FOOTER_HEIGHT: f32 = 60.0;
+const ROW_HEIGHT: f32 = 60.0;
 
-pub struct BluetoothWindow {
-    pub title: String,
-    pub device_list: Vec<BluetoothDevice>,
-    pub bt_tx: mpsc::Sender<BtEvents>,
-
-    // Scrolling state
-    scroll_offset: Pixels,
-    last_scroll_offset: Pixels,
-    drag_start_y: Pixels,
-    is_dragging: bool,
-}
-
-impl BluetoothWindow {
-    pub fn new(
-        title: String,
-        device_list: Option<Vec<BluetoothDevice>>,
-        bt_tx: mpsc::Sender<BtEvents>,
-    ) -> Self {
-        Self {
-            title,
-            device_list: device_list.unwrap_or_default(),
-            bt_tx,
-            scroll_offset: px(0.),
-            last_scroll_offset: px(0.),
-            drag_start_y: px(0.),
-            is_dragging: false,
-        }
-    }
+// Trait for scrollable behavior
+pub trait ScrollBehavior {
+    fn scroll_offset(&self) -> Pixels;
+    fn set_scroll_offset(&mut self, offset: Pixels);
+    fn is_dragging(&self) -> bool;
 
     fn calculate_scroll_bounds(
         &self,
@@ -54,10 +29,56 @@ impl BluetoothWindow {
         }
     }
 
-    fn estimate_content_height(&self) -> Pixels {
+    fn estimate_content_height(&self, item_count: usize) -> Pixels;
+
+    fn on_mouse_down(&mut self, event: &MouseDownEvent);
+    fn on_mouse_up(&mut self);
+    fn on_mouse_move(&mut self, event: &MouseMoveEvent, window_height: Pixels, item_count: usize);
+}
+
+// Implementation for wireless modal scroll
+#[derive(Debug, Clone)]
+pub struct BluetoothModalScroll {
+    scroll_offset: Pixels,
+    last_scroll_offset: Pixels,
+    drag_start_y: Pixels,
+    is_dragging: bool,
+}
+
+impl Default for BluetoothModalScroll {
+    fn default() -> Self {
+        Self {
+            scroll_offset: px(0.),
+            last_scroll_offset: px(0.),
+            drag_start_y: px(0.),
+            is_dragging: false,
+        }
+    }
+}
+
+impl BluetoothModalScroll {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl ScrollBehavior for BluetoothModalScroll {
+    fn scroll_offset(&self) -> Pixels {
+        self.scroll_offset
+    }
+
+    fn set_scroll_offset(&mut self, offset: Pixels) {
+        self.scroll_offset = offset;
+    }
+
+    fn is_dragging(&self) -> bool {
+        self.is_dragging
+    }
+
+    fn estimate_content_height(&self, list_count: usize) -> Pixels {
         let item_height = px(ROW_HEIGHT);
         let gap = px(8.);
-        let item_count = self.device_list.len() as f32;
+        let item_count = list_count as f32;
 
         if item_count == 0.0 {
             px(0.)
@@ -66,47 +87,41 @@ impl BluetoothWindow {
         }
     }
 
-    fn on_mouse_down(
-        &mut self,
-        event: &MouseDownEvent,
-        _: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
+    fn on_mouse_down(&mut self, event: &MouseDownEvent) {
         self.drag_start_y = event.position.y;
         self.last_scroll_offset = self.scroll_offset;
         self.is_dragging = true;
-        cx.stop_propagation();
     }
 
-    fn on_mouse_up(&mut self, _event: &MouseUpEvent, _: &mut Window, _cx: &mut Context<Self>) {
+    fn on_mouse_up(&mut self) {
         self.is_dragging = false;
     }
 
     fn on_mouse_move(
         &mut self,
         event: &MouseMoveEvent,
-        window: &mut Window,
-        cx: &mut Context<Self>,
+        window_height: Pixels,
+        list_count: usize,
     ) {
         if self.is_dragging {
             let delta_y = event.position.y - self.drag_start_y;
-            let window_height = window.bounds().size.height;
             
-            let container_height = window_height - px(8.) - px(HEADER_HEIGHT) - px(FOOTER_HEIGHT);
-            let content_height = self.estimate_content_height();
+            let container_height = window_height - px(HEADER_HEIGHT) - px(FOOTER_HEIGHT);
+            let content_height = self.estimate_content_height(list_count);
 
             let (min_scroll, max_scroll) =
                 self.calculate_scroll_bounds(content_height, container_height);
 
             self.scroll_offset = (self.last_scroll_offset + delta_y).clamp(min_scroll, max_scroll);
-
-            cx.notify();
         }
     }
 }
 
-impl Render for BluetoothWindow {
-    fn render(&mut self, _window: &mut Window, ctx: &mut Context<Self>) -> impl IntoElement {
+impl SettingsDrawer {
+    pub fn render_bluetooth_modal(&mut self, cx: &mut gpui::Context<SettingsDrawer>) -> AnyElement {
+        let device_list = self.bluetooth_details.available_devices.clone().unwrap_or_default();
+        let device_count = device_list.len();
+
         div()
             .flex()
             .flex_col()
@@ -115,49 +130,52 @@ impl Render for BluetoothWindow {
             .border_1()
             .rounded_xl()
             .border_color(rgb(AMBER_900))
-            // Header  
-            .child(
-                div()
-                    .flex()
-                    .flex_row()
-                    .items_center()
-                    .justify_between()
-                    .w_full()
-                    .p_4()
-                    .h(px(HEADER_HEIGHT))
-                    .border_b_1()
-                    .bg(rgb(DARK_NEUTRAL_800))
-                    .flex_shrink_0()  
-                    .child(
-                        div()
-                            .text_size(px(20.))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(rgb(DARK_NEUTRAL_0))
-                            .child(self.title.clone()),
-                    )
-            )
-            // Scrollable container  
+            .child( self.render_header_div(cx, "Bluetooth"))
+            // Scrollable container
             .child(
                 div()
                     .flex()
                     .flex_col()
                     .flex_1()
-                    .overflow_hidden()  
-                    .relative()  
-                    .on_mouse_down(MouseButton::Left, ctx.listener(Self::on_mouse_down))
-                    .on_mouse_up(MouseButton::Left, ctx.listener(Self::on_mouse_up))
-                    .on_mouse_move(ctx.listener(Self::on_mouse_move))
+                    .overflow_hidden()
+                    .relative()
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(move |this, event: &MouseDownEvent, _window, cx| {
+                            this.bluetooth_modal_scroll.on_mouse_down(event);
+                            cx.stop_propagation();
+                            cx.notify();
+                        }),
+                    )
+                    .on_mouse_up(
+                        MouseButton::Left,
+                        cx.listener(move |this, _event: &MouseUpEvent, _window, cx| {
+                            this.bluetooth_modal_scroll.on_mouse_up();
+                            cx.notify();
+                        }),
+                    )
+                    .on_mouse_move(
+                        cx.listener(move |this, event: &MouseMoveEvent, window, cx| {
+                            let window_height = window.bounds().size.height;
+                            this.bluetooth_modal_scroll.on_mouse_move(
+                                event,
+                                window_height,
+                                device_count,
+                            );
+                            cx.notify();
+                        }),
+                    )
                     .child(
-                        // Content with scroll offset 
+                        // Content with scroll offset
                         div()
-                            .absolute()  
-                            .top(self.scroll_offset)  
+                            .absolute()
+                            .top(self.bluetooth_modal_scroll.scroll_offset())
                             .left(px(0.))
                             .right(px(0.))
                             .flex()
                             .flex_col()
                             .gap_2()
-                            .children(self.device_list.iter().enumerate().map(
+                                .children(device_list.iter().enumerate().map(
                                 |(idx, bt)| {
                                     let name = &bt.name;
                                     let is_connected = bt.connected;
@@ -217,6 +235,7 @@ impl Render for BluetoothWindow {
                                         .px_4()
                                         .rounded_md()
                                         .bg(rgb(DARK_NEUTRAL_900))
+                                        .hover(|style| style.bg(rgba(AMBER_600_10)))
                                         .child(
                                             div()
                                                 .flex()
@@ -241,7 +260,7 @@ impl Render for BluetoothWindow {
                                     if !is_connected && !is_paired {
                                         // TODO: call pair and connect device
                                         // TODO: check if device need auth - open portal
-                                        bluetooth_div = bluetooth_div.on_click(ctx.listener(
+                                        bluetooth_div = bluetooth_div.on_click(cx.listener(
                                             move |_, _, _, _| {
                                                 println!(
                                                     "TODO: open portal/settings with params:"
@@ -254,7 +273,7 @@ impl Render for BluetoothWindow {
 
                                         bluetooth_div =
                                             bluetooth_div
-                                            .on_click(ctx.listener(
+                                            .on_click(cx.listener(
                                             move |_,
                                             _event: &ClickEvent,
                                             window: &mut Window,
@@ -283,35 +302,8 @@ impl Render for BluetoothWindow {
                             )),
                     ),
             )
-            // Footer  
-            .child(
-                div()
-                    .id("id_settings")
-                    .flex()
-                    .flex_row()
-                    .items_center()
-                    .justify_start()
-                    .border_t_1()
-                    .border_color(rgb(DARK_NEUTRAL_700))
-                    .h(px(FOOTER_HEIGHT))
-                    .p_4()
-                    .flex_shrink_0()  
-                    .child(
-                        Icon::new(IconName::Settings)
-                            .size((px(28.), px(28.)))
-                            .text_color(rgb(AMBER_600)),
-                    )
-                    .child(
-                        div()
-                            .text_size(px(18.))
-                            .pl_2()
-                            .font_weight(FontWeight::NORMAL)
-                            .text_color(rgb(AMBER_600))
-                            .child("Settings"),
-                    )
-                    .on_click(ctx.listener(|_, _, _, _| {
-                        println!("settings clicked");
-                    }))
-            )
+            // Footer
+            .child(self.render_settings_div(cx))
+            .into_any()
     }
 }

@@ -25,7 +25,6 @@ struct ExtendOption {
 }
 
 impl SettingsDrawer {
-    // settings drawer
     fn extended_screens(&self) -> Vec<ExtendOption> {
         // extended screen
         let extend_options = vec![
@@ -67,26 +66,7 @@ impl SettingsDrawer {
             .rounded_xl()
             .border_1()
             .border_color(rgb(AMBER_800))
-            .child(
-                // Header
-                div()
-                    .flex()
-                    .flex_row()
-                    .items_center()
-                    .justify_between()
-                    .w_full()
-                    .p_4()
-                    .h(px(ROW_HEIGHT))
-                    .bg(rgb(DARK_NEUTRAL_800))
-                    .flex_shrink_0()
-                    .child(
-                        div()
-                            .text_size(px(20.))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(rgb(DARK_NEUTRAL_0))
-                            .child("Extended Screen"),
-                    ),
-            )
+            .child(self.render_header_div(cx, "Extended screen"))
             .child(div().flex().flex_col().flex_1().relative().children(
                 extend_options.iter().enumerate().map(|(idx, ex)| {
                     let is_active = ex.is_active;
@@ -182,36 +162,7 @@ impl SettingsDrawer {
                 }),
             ))
             // Footer
-            .child(
-                div()
-                    .id("id_settings")
-                    .flex()
-                    .flex_row()
-                    .items_end()
-                    .justify_start()
-                    .border_t_1()
-                    .border_color(rgb(DARK_NEUTRAL_700))
-                    .h(px(ROW_HEIGHT))
-                    .p_4()
-                    .flex_shrink_0()
-                    .hover(|style| style.bg(rgba(AMBER_600_10)))
-                    .child(
-                        Icon::new(IconName::Settings)
-                            .size((px(28.), px(28.)))
-                            .text_color(rgb(AMBER_600)),
-                    )
-                    .child(
-                        div()
-                            .text_size(px(18.))
-                            .pl_2()
-                            .font_weight(FontWeight::NORMAL)
-                            .text_color(rgb(AMBER_600))
-                            .child("Settings"),
-                    )
-                    .on_click(cx.listener(move |_, _, _, _| {
-                        println!("option clicked...");
-                    })),
-            )
+            .child(self.render_settings_div(cx))
             .into_any()
     }
 }

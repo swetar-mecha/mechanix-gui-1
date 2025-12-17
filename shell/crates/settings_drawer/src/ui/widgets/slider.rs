@@ -166,6 +166,7 @@ impl RenderOnce for Slider {
             .w(px(width))
             .h(px(height))
             .flex()
+            .pl_2()
             .child(match pattern {
                 SliderPattern::Dots => {
                     let unit_size = DOT_SIZE + DOT_GAP;

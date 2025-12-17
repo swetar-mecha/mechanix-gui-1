@@ -1,6 +1,4 @@
-use std::time::{Duration, Instant};
-
-use chrono::{Local, format};
+use chrono::Local;
 use gpui::prelude::FluentBuilder;
 pub mod icon;
 mod modals;
@@ -10,9 +8,7 @@ use crate::get_wireless_strength_icon;
 use crate::prelude::*;
 use crate::services::DEFAULT_MIN_BRIGHTNESS;
 use crate::ui::icon::Icon;
-use crate::ui::modals::{
-    BluetoothWindow, DisplayWindow, PerformanceWindow, SoundWindow, WirelessWindow,
-};
+use crate::ui::modals::*;
 use crate::{
     events::BtEvents,
     ui::{
@@ -24,11 +20,9 @@ use bluez::interfaces::device::BluetoothDevice;
 use futures::{SinkExt, channel::mpsc};
 use gpui::*;
 use networkmanager::interfaces::wireless::WirelessNetworkInfo;
-use upower::interfaces::device::BatteryState;
 
 const NAVBAR_SIZE: (f32, f32) = (180., 29.);
 const APP_SIZE: (f32, f32) = (540., 620.);
-const MODAL_SIZE: (f32, f32) = (478., 392.);
 
 const MIN_MODAL_SIZE_1: (f32, f32) = (133., 110.);
 const MIN_MODAL_SIZE_2: (f32, f32) = (203., 168.);
@@ -70,23 +64,21 @@ pub fn get_current_datetime() -> String {
 
 pub struct SettingsDrawer {
     pub current_time_date: String,
-    pub settings_active: bool,
-
-    pub battery_state: BatteryState,
-    pub battery_percent: u8,
-
     pub open_power_options: bool,
 
     pub rotation_on: bool,
     pub airplane_mode: bool,
     pub screen_mirroring: bool,
-    pub power_mode: PowerMode,
+    pub open_terminal: bool,
+
     pub microphone_recording: bool,
     pub screen_recording: bool,
-
+    pub settings_active: bool,
+    // camera
     pub wireless_details: WirelessDetails,
     pub bluetooth_details: BluetoothDetails,
-    pub open_terminal: bool,
+    pub power_mode: PowerMode,
+    pub battery_percent: u8,
     pub cell_signal: bool,
 
     pub brightness_slider_state: Entity<SliderState>,
@@ -99,9 +91,6 @@ pub struct SettingsDrawer {
     pub volume_device_name: Option<String>,
     pub volume_mute: bool,
 
-    pub show_wireless_modal: bool,
-    pub show_bluetooth_modal: bool,
-
     pub nm_tx: mpsc::Sender<NmEvents>,
     pub bt_tx: mpsc::Sender<BtEvents>,
     pub volume_tx: mpsc::Sender<VolumeEvents>,
@@ -109,19 +98,30 @@ pub struct SettingsDrawer {
     pub open_modal: bool,
     pub animating: bool,
     pub animation_progress: f32,
-    pub modal_opacity: f32,
+    pub modal_opacity: f32, // TEMP: remove if not required
     pub modal_sizes: Vec<(f32, f32)>,
     pub modal_size: (f32, f32),
 
-    current_step: usize,      // 0=MIN1, 1=MIN2, 2=MIN3, 3=MIN4, 4=FINAL
-    step_start_time: Instant, // Track when current step started
-    step_duration: Duration,  // Time per step (e.g., 100
+    pub current_modal: ModalKind,
+    pub wireless_modal_scroll: WirelessModalScroll,
+    pub bluetooth_modal_scroll: BluetoothModalScroll,
 
     _subscriptions: Vec<Subscription>,
 
     position: f32,
     drag_offset: Option<f32>,
     drag_start_pos: f32,
+}
+
+#[derive(Clone, Debug)]
+pub enum ModalKind {
+    None,
+    WirelessModal,
+    BluetoothModal,
+    ScreenMirroring,
+    PerformanceModal,
+    DisplayModal,
+    SoundModal,
 }
 
 impl SettingsDrawer {
@@ -211,7 +211,6 @@ impl SettingsDrawer {
         Self {
             current_time_date: get_current_datetime(),
             settings_active: false,
-            battery_state: BatteryState::Unknown,
             battery_percent: 0,
             open_power_options: false,
             rotation_on: false,
@@ -253,14 +252,11 @@ impl SettingsDrawer {
             modal_sizes: vec![(MIN_MODAL_SIZE_1)],
             modal_size: (MIN_MODAL_SIZE_1.0, MIN_MODAL_SIZE_1.1),
 
-            current_step: 0,
-            step_start_time: Instant::now(),
-            step_duration: Duration::from_millis(100),
-
             _subscriptions,
 
-            show_wireless_modal: false,
-            show_bluetooth_modal: false,
+            current_modal: ModalKind::None,
+            wireless_modal_scroll: WirelessModalScroll::new(),
+            bluetooth_modal_scroll: BluetoothModalScroll::new(),
 
             position: Self::closed_pos(),
             drag_offset: None,
@@ -466,9 +462,10 @@ impl SettingsDrawer {
             } else {
                 window.request_animation_frame();
             }
-
-            // println!("modal_sizes: {:?}", self.modal_sizes);
         }
+
+        let modal_sizes = self.modal_sizes.clone();
+
         div()
             .id("main_container")
             .flex()
@@ -528,7 +525,7 @@ impl SettingsDrawer {
                     .child(self.render_bluetooth(cx))
                     .child(self.render_battery_performance(cx))
                     .child(self.render_cell_signal(cx))
-                    .child(self.render_brightness_control(cx))
+                    .child(self.render_brightness_control_div(cx))
                     .child(
                         div()
                             .id("id_sound")
@@ -609,7 +606,9 @@ impl SettingsDrawer {
                             // .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                             // .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                             // .on_click(|_, _, cx| cx.stop_propagation())
-                            .children(self.modal_sizes.iter().enumerate().map(|(idx, &(w, h))| {
+                            .children(modal_sizes.iter().enumerate().map(|(idx, &(w, h))| {
+                                let w = w.clone();
+                                let h = h.clone();
                                 div()
                                     .id(("modal-item", idx))
                                     .absolute()
@@ -646,7 +645,28 @@ impl SettingsDrawer {
                                             //             .text_color(rgb(DARK_NEUTRAL_0))
                                             //             .child("Extended screen".to_string()),
                                             //     ),
-                                            self.render_extended_screen_options(cx),
+                                            match self.current_modal {
+                                                ModalKind::ScreenMirroring => {
+                                                    self.render_extended_screen_options(cx)
+                                                }
+                                                ModalKind::WirelessModal => {
+                                                    self.render_wireless_modal(cx)
+                                                }
+                                                ModalKind::BluetoothModal => {
+                                                    self.render_bluetooth_modal(cx)
+                                                }
+                                                ModalKind::SoundModal => {
+                                                    self.render_sound_modal(cx)
+                                                }
+                                                ModalKind::PerformanceModal => {
+                                                    println!("performance modal requested...");
+                                                    self.render_battery_performance_modal(cx)
+                                                }
+                                                ModalKind::DisplayModal => {
+                                                    self.render_display_modal(cx)
+                                                }
+                                                ModalKind::None => Empty.into_any(),
+                                            },
                                         )
                                     })
                             })),
@@ -853,6 +873,7 @@ impl SettingsDrawer {
                     // this.open_modal = !this.open_modal;
                     // this.screen_mirroring = !this.screen_mirroring;
                     println!("long press started");
+                    this.current_modal = ModalKind::ScreenMirroring;
                     Self::start_animation(this, _event, _window, cx);
 
                     cx.notify();
@@ -975,56 +996,35 @@ impl SettingsDrawer {
             .label(network_label)
             .active_icon_color(rgb(AMBER_600))
             .active_bg_color(rgba(AMBER_600_10))
-        // // 10% - ok - keeping while it is active
-        // .on_click(cx.listener(
-        //     |this: &mut SettingsDrawer,
-        //      _event: &ClickEvent,
-        //      _window: &mut Window,
-        //      cx: &mut Context<Self>| {
-        //         let mut nm_tx = this.nm_tx.clone();
-        //         let is_enable = this.wireless_details.enabled;
-        //         cx.background_executor()
-        //             .spawn(async move {
-        //                 let _ = nm_tx
-        //                     .send(NmEvents::WirelessToggle {
-        //                         enabled: !is_enable,
-        //                     })
-        //                     .await;
-        //             })
-        //             .detach();
-        //     },
-        // )),
-        // .on_click(cx.listener(  // TEMP; TODO: long press open modal
-        //     move |this: &mut SettingsDrawer,
-        //     _event: &ClickEvent,
-        //     _window: &mut Window,
-        //     cx: &mut Context<Self>| {
-        //         println!("wireless clicked");
-
-        //             let popup_bounds = Bounds::centered(None, size(px(MODAL_SIZE.0), px(MODAL_SIZE.1)), cx);
-        //             cx.open_window(
-        //             WindowOptions {
-
-        //                 titlebar: None,
-        //                 kind: WindowKind::PopUp,
-        //                 is_movable: false,
-        //                 window_bounds:Some(
-        //                         WindowBounds::Windowed(
-        //                             popup_bounds,
-        //                         ),
-        //                     ),
-        //                 ..Default::default()
-        //             },
-        //             |_, cx| {
-        //                 cx.new(|_|
-        //                     WirelessWindow::new("Wireless".to_string(), this.wireless_details.networks.clone().unwrap(), this.nm_tx.clone())
-        //             )
-        //             },
-        //         )
-        //         .unwrap();
-
-        //     },
-        // )),
+            // // 10% - ok - keeping while it is active
+            // .on_click(cx.listener(
+            //     |this: &mut SettingsDrawer,
+            //      _event: &ClickEvent,
+            //      _window: &mut Window,
+            //      cx: &mut Context<Self>| {
+            //         let mut nm_tx = this.nm_tx.clone();
+            //         let is_enable = this.wireless_details.enabled;
+            //         cx.background_executor()
+            //             .spawn(async move {
+            //                 let _ = nm_tx
+            //                     .send(NmEvents::WirelessToggle {
+            //                         enabled: !is_enable,
+            //                     })
+            //                     .await;
+            //             })
+            //             .detach();
+            //     },
+            // )),
+            .on_click(cx.listener(
+                // TEMP; TODO: long press open modal
+                move |this: &mut SettingsDrawer,
+                      _event: &ClickEvent,
+                      _window: &mut Window,
+                      cx: &mut Context<Self>| {
+                    this.current_modal = ModalKind::WirelessModal;
+                    Self::start_animation(this, _event, _window, cx);
+                },
+            ))
     }
 
     fn render_bluetooth(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -1053,63 +1053,35 @@ impl SettingsDrawer {
             .active(self.bluetooth_details.enabled)
             .active_icon_color(rgb(AMBER_600))
             .active_bg_color(rgba(AMBER_600_10))
-        // .on_click(cx.listener(
-        //     |this: &mut SettingsDrawer,
-        //      _event: &ClickEvent,
-        //      _window: &mut Window,
-        //      cx: &mut Context<Self>| {
-        //         let mut bt_tx = this.bt_tx.clone();
-        //         let is_enable = this.bluetooth_details.enabled;
-        //         cx.background_executor()
-        //             .spawn(async move {
-        //                 let _ = bt_tx
-        //                     .send(BtEvents::BluetoothToggle {
-        //                         enabled: !is_enable,
-        //                     })
-        //                     .await;
-        //             })
-        //             .detach();
-        //     },
-        // )),
-        // .on_click(cx.listener(  // TEMP; TODO: long press open modal
-        //     move |this: &mut SettingsDrawer,
-        //     _event: &ClickEvent,
-        //     _window: &mut Window,
-        //     cx: &mut Context<Self>| {
-        //         println!("bluetooth clicked");
-
-        //         let popup_origin = point(
-        //                 window_bounds.origin.x,
-        //                 window_bounds.origin.y,
-        //             );
-
-        //             let popup_bounds = Bounds {
-        //                 origin: popup_origin,
-        //                 size: size(px(476.0), px(338.0)),
-        //             };
-
-        //             cx.open_window(
-        //             WindowOptions {
-        //                 titlebar: None,
-        //                 kind: WindowKind::PopUp,
-        //                 is_movable: false,
-        //                 window_bounds:Some(
-        //                         WindowBounds::Windowed(
-        //                             popup_bounds,
-        //                         ),
-        //                     ),
-        //                 ..Default::default()
-        //             },
-        //             |_, cx| {
-        //                 cx.new(|_|
-        //                     BluetoothWindow::new("Bluetooth".to_string(), this.bluetooth_details.available_devices.clone(), this.bt_tx.clone())
-        //             )
-        //             },
-        //         )
-        //         .unwrap();
-
-        //     },
-        // )),
+            // .on_click(cx.listener(
+            //     |this: &mut SettingsDrawer,
+            //      _event: &ClickEvent,
+            //      _window: &mut Window,
+            //      cx: &mut Context<Self>| {
+            //         let mut bt_tx = this.bt_tx.clone();
+            //         let is_enable = this.bluetooth_details.enabled;
+            //         cx.background_executor()
+            //             .spawn(async move {
+            //                 let _ = bt_tx
+            //                     .send(BtEvents::BluetoothToggle {
+            //                         enabled: !is_enable,
+            //                     })
+            //                     .await;
+            //             })
+            //             .detach();
+            //     },
+            // )),
+            .on_click(cx.listener(
+                // TEMP; TODO: long press open modal
+                move |this: &mut SettingsDrawer,
+                      _event: &ClickEvent,
+                      _window: &mut Window,
+                      cx: &mut Context<Self>| {
+                    println!("bluetooth clicked");
+                    this.current_modal = ModalKind::BluetoothModal;
+                    Self::start_animation(this, _event, _window, cx);
+                },
+            ))
     }
 
     fn render_battery_performance(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -1130,31 +1102,15 @@ impl SettingsDrawer {
             .icon_color(power_mode_icon_color)
             .active_icon_color(rgb(AMBER_600))
             .active_bg_color(rgba(AMBER_600_10))
-        // .on_click(cx.listener(
-        //     move |this: &mut SettingsDrawer,
-        //     _event: &ClickEvent,
-        //     _window: &mut Window,
-        //     cx: &mut Context<Self>| {
-        //         let popup_bounds = Bounds::centered(None, size(px(MODAL_SIZE.0), px(MODAL_SIZE.1)), cx);
-        //         cx.open_window(
-        //         WindowOptions {
-        //             titlebar: None,
-        //             kind: WindowKind::PopUp,
-        //             is_movable: false,
-        //             window_bounds:Some(
-        //                     WindowBounds::Windowed(
-        //                         popup_bounds,
-        //                     ),
-        //                 ),
-        //             ..Default::default()
-        //         },
-        //         |_, cx| {
-        //             cx.new(|_|
-        //                 PerformanceWindow::new("Battery".to_string())
-
-        //         )}).unwrap();
-        //     },
-        // )),
+            .on_click(cx.listener(
+                move |this: &mut SettingsDrawer,
+                      _event: &ClickEvent,
+                      _window: &mut Window,
+                      cx: &mut Context<Self>| {
+                    this.current_modal = ModalKind::PerformanceModal;
+                    Self::start_animation(this, _event, _window, cx);
+                },
+            ))
     }
 
     fn render_cell_signal(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -1177,15 +1133,7 @@ impl SettingsDrawer {
         // )),
     }
 
-    fn render_brightness_control(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let brightness_icon =
-            if self.brightness_slider_value >= 0.0 && self.brightness_slider_value <= 33.0 {
-                IconName::BrightnessLow
-            } else if self.brightness_slider_value > 33.0 && self.brightness_slider_value <= 66.0 {
-                IconName::BrightnessMedium
-            } else {
-                IconName::BrightnessHigh
-            };
+    fn render_brightness_control_div(&self, cx: &mut Context<Self>) -> impl IntoElement {
         div()
             .id("id_display")
             .flex()
@@ -1196,57 +1144,80 @@ impl SettingsDrawer {
             .col_span(2)
             .bg(rgb(DARK_NEUTRAL_900))
             .rounded(px(8.))
+            .when(!self.open_modal, |this| {
+                this.on_click(cx.listener(
+                    // CHECK - on long press
+                    move |this: &mut SettingsDrawer,
+                          _event: &ClickEvent,
+                          _window: &mut Window,
+                          cx: &mut Context<Self>| {
+                        this.current_modal = ModalKind::DisplayModal;
+                        Self::start_animation(this, _event, _window, cx);
+                    },
+                ))
+            })
+            .child(self.render_brightness_slider(cx, 167.0))
+    }
+
+    pub fn render_brightness_slider(&self, cx: &mut Context<Self>, width: f32) -> impl IntoElement {
+        let brightness_icon =
+            if self.brightness_slider_value >= 0.0 && self.brightness_slider_value <= 33.0 {
+                IconName::BrightnessLow
+            } else if self.brightness_slider_value > 33.0 && self.brightness_slider_value <= 66.0 {
+                IconName::BrightnessMedium
+            } else {
+                IconName::BrightnessHigh
+            };
+        div()
+            .flex()
+            .flex_row()
+            .w_full()
+            .items_center()
+            .justify_start()
+            .pl_2()
+            .child(
+                IconButton::new("id_brightness")
+                    .icon(brightness_icon)
+                    .icon_color(rgb(AMBER_600))
+                    .size((px(32.), px(32.)))
+                    .bg_color(rgb(DARK_NEUTRAL_900))
+                    .active_bg_color(rgb(DARK_NEUTRAL_900))
+                    .border(px(0.)), //     .on_click(cx.listener(  // todo: show modal on long press
+                                     //             move |this: &mut SettingsDrawer,
+                                     //             _event: &ClickEvent,
+                                     //             _window: &mut Window,
+                                     //             cx: &mut Context<Self>| {
+                                     //                 let popup_bounds = Bounds::centered(None, size(px(MODAL_SIZE.0), px(MODAL_SIZE.1)), cx);
+                                     //                 cx.open_window(
+                                     //                 WindowOptions {
+                                     //                     titlebar: None,
+                                     //                     kind: WindowKind::PopUp,
+                                     //                     is_movable: false,
+                                     //                     window_bounds:Some(
+                                     //                             WindowBounds::Windowed(
+                                     //                                 popup_bounds,
+                                     //                             ),
+                                     //                         ),
+                                     //                     ..Default::default()
+                                     //                         },
+                                     //                         |_, cx| {
+                                     //                             cx.new(|_|
+                                     //                                 DisplayWindow::new("Display brightness".to_string(), this.auto_brightness, this.dark_mode)
+                                     //                             )
+                                     //                         }).unwrap();
+                                     //                     },
+                                     // ))
+            )
             .child(
                 div()
                     .flex()
-                    .flex_row()
-                    .w_full()
+                    .justify_center()
                     .items_center()
-                    .justify_around()
-                    .px_2()
+                    .w(px(width))
                     .child(
-                        IconButton::new("id_brightness")
-                            .icon(brightness_icon)
-                            .icon_color(rgb(BRIGHTNESS_ICON_COLOR))
-                            .size((px(32.), px(32.)))
-                            .bg_color(rgb(DARK_NEUTRAL_900))
-                            .active_bg_color(rgb(DARK_NEUTRAL_900))
-                            .border(px(0.)), //     .on_click(cx.listener(  // todo: show modal on long press
-                                             //             move |this: &mut SettingsDrawer,
-                                             //             _event: &ClickEvent,
-                                             //             _window: &mut Window,
-                                             //             cx: &mut Context<Self>| {
-                                             //                 let popup_bounds = Bounds::centered(None, size(px(MODAL_SIZE.0), px(MODAL_SIZE.1)), cx);
-                                             //                 cx.open_window(
-                                             //                 WindowOptions {
-                                             //                     titlebar: None,
-                                             //                     kind: WindowKind::PopUp,
-                                             //                     is_movable: false,
-                                             //                     window_bounds:Some(
-                                             //                             WindowBounds::Windowed(
-                                             //                                 popup_bounds,
-                                             //                             ),
-                                             //                         ),
-                                             //                     ..Default::default()
-                                             //                         },
-                                             //                         |_, cx| {
-                                             //                             cx.new(|_|
-                                             //                                 DisplayWindow::new("Display brightness".to_string(), this.auto_brightness, this.dark_mode)
-                                             //                             )
-                                             //                         }).unwrap();
-                                             //                     },
-                                             // ))
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .justify_center()
-                            .items_center()
-                            .w(px(167.0))
-                            .child(
-                                Slider::new("brightness-slider", &self.brightness_slider_state)
-                                    .height(66.0),
-                            ),
+                        Slider::new("brightness-slider", &self.brightness_slider_state)
+                            .height(66.0)
+                            .width(width),
                     ),
             )
     }
@@ -1264,55 +1235,74 @@ impl SettingsDrawer {
             }
         };
         let volume_icon_color = if self.volume_mute {
-            MUTE_SOUND_COLOR
+            DARK_NEUTRAL_0
         } else {
-            UNMUTE_SOUND_COLOR
+            AMBER_600
         };
 
         div()
+            .id("id_volume")
             .flex()
             .flex_row()
             .w_full()
             .items_center()
-            .justify_around()
+            .justify_start()
             .pl_2()
+            .on_click(cx.listener(
+                // TEMP; TODO: long press open modal
+                move |this: &mut SettingsDrawer,
+                      _event: &ClickEvent,
+                      _window: &mut Window,
+                      cx: &mut Context<Self>| {
+                    println!("volume clicked");
+                    this.current_modal = ModalKind::SoundModal;
+                    Self::start_animation(this, _event, _window, cx);
+                },
+            ))
             .child(
-                IconButton::new("id_volume")
+                IconButton::new("id_mute_volume")
                     .icon(volume_icon)
                     .icon_color(rgb(volume_icon_color))
                     .size((px(32.), px(32.)))
                     .bg_color(rgb(DARK_NEUTRAL_900))
                     .active_bg_color(rgb(DARK_NEUTRAL_900))
-                    .border(px(0.)), //         .on_click(cx.listener(
-                                     //     |this: &mut SettingsDrawer,
-                                     //     _event: &ClickEvent,
-                                     //     _window: &mut Window,
-                                     //     cx: &mut Context<Self>| {
-                                     //         let mut volume_tx = this.volume_tx.clone();
-                                     //         this.volume_mute = !this.volume_mute;
-                                     //         let is_mute = this.volume_mute;
-                                     //         let sink_name = this.volume_device_name.clone().unwrap_or_else(|| "default".to_string());
+                    .border(px(0.))
+                    .on_click(cx.listener(
+                        |this: &mut SettingsDrawer,
+                         _event: &ClickEvent,
+                         _window: &mut Window,
+                         cx: &mut Context<Self>| {
+                            let mut volume_tx = this.volume_tx.clone();
+                            this.volume_mute = !this.volume_mute;
+                            let is_mute = this.volume_mute;
+                            let sink_name = this
+                                .volume_device_name
+                                .clone()
+                                .unwrap_or_else(|| "default".to_string());
 
-                                     //         if is_mute {
-                                     //             cx.background_executor()
-                                     //             .spawn(async move {
-                                     //                 let _ = volume_tx
-                                     //                     .send(VolumeEvents::MuteSink { name: sink_name.clone() })
-                                     //                     .await;
-                                     //             })
-                                     //             .detach();
-                                     //         } else {
-                                     //             cx.background_executor()
-                                     //             .spawn(async move {
-                                     //                 let _ = volume_tx
-                                     //                     .send(VolumeEvents::UnmuteSink { name: sink_name.clone() })
-                                     //                     .await;
-                                     //             })
-                                     //             .detach();
-                                     //         }
-
-                                     //     },
-                                     // )),
+                            if is_mute {
+                                cx.background_executor()
+                                    .spawn(async move {
+                                        let _ = volume_tx
+                                            .send(VolumeEvents::MuteSink {
+                                                name: sink_name.clone(),
+                                            })
+                                            .await;
+                                    })
+                                    .detach();
+                            } else {
+                                cx.background_executor()
+                                    .spawn(async move {
+                                        let _ = volume_tx
+                                            .send(VolumeEvents::UnmuteSink {
+                                                name: sink_name.clone(),
+                                            })
+                                            .await;
+                                    })
+                                    .detach();
+                            }
+                        },
+                    )),
             )
             .child(
                 div()

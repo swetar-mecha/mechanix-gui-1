@@ -14,7 +14,3 @@ pub const AMBER_600: u32 = 0xC67600;
 pub const AMBER_900: u32 = 0x804B00;
 pub const AMBER_800: u32 = 0x945700;
 pub const AMBER_1000: u32 = 0x5F3600;
-
-pub const BRIGHTNESS_ICON_COLOR: u32 = 0xC67600;
-pub const MUTE_SOUND_COLOR: u32 = 0xD2D2D2;
-pub const UNMUTE_SOUND_COLOR: u32 = 0xC67600;

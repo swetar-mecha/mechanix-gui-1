@@ -18,18 +18,11 @@ struct PerformanceMode {
     is_active: bool,
 }
 
-pub struct PerformanceWindow {
-    pub title: String,
-}
-
-impl PerformanceWindow {
-    pub fn new(title: String) -> Self {
-        Self { title }
-    }
-}
-
-impl Render for PerformanceWindow {
-    fn render(&mut self, _window: &mut Window, ctx: &mut Context<Self>) -> impl IntoElement {
+impl SettingsDrawer {
+    pub fn render_battery_performance_modal(
+        &self,
+        cx: &mut gpui::Context<SettingsDrawer>,
+    ) -> AnyElement {
         let performance_modes = vec![
             PerformanceMode {
                 performance_mode: "high".to_string(),
@@ -51,27 +44,7 @@ impl Render for PerformanceWindow {
             .border_1()
             .rounded_xl()
             .border_color(rgb(AMBER_900))
-            .child(
-                // Header
-                div()
-                    .flex()
-                    .flex_row()
-                    .items_center()
-                    .justify_between()
-                    .w_full()
-                    .p_4()
-                    .h(px(ROW_HEIGHT))
-                    .border_b_1()
-                    .bg(rgb(DARK_NEUTRAL_800))
-                    .flex_shrink_0()
-                    .child(
-                        div()
-                            .text_size(px(20.))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .text_color(rgb(DARK_NEUTRAL_0))
-                            .child(self.title.clone()),
-                    ),
-            )
+            .child(self.render_header_div(cx, "Battery"))
             .child(div().flex().flex_col().flex_1().relative().children(
                 performance_modes.iter().enumerate().map(|(idx, mode)| {
                     let is_active = mode.is_active;
@@ -101,7 +74,7 @@ impl Render for PerformanceWindow {
                             .flex()
                             .items_center()
                             .justify_between()
-                            .h(px(60.))
+                            .h(px(ROW_HEIGHT))
                             .px_4()
                             .bg(if is_active {
                                 rgba(AMBER_600_10)
@@ -140,6 +113,7 @@ impl Render for PerformanceWindow {
                             .justify_between()
                             .h(px(60.))
                             .px_4()
+                            .hover(|style| style.bg(rgba(AMBER_600_10)))
                             .child(
                                 div()
                                     .flex()
@@ -161,7 +135,7 @@ impl Render for PerformanceWindow {
                                             .child(mode.text.clone()),
                                     ),
                             )
-                            .on_click(ctx.listener(move |_, _, _, _| {
+                            .on_click(cx.listener(move |_, _, _, _| {
                                 println!("mode clicked...");
                             }))
                     };
@@ -170,34 +144,7 @@ impl Render for PerformanceWindow {
                 }),
             ))
             // Footer
-            .child(
-                div()
-                    .id("id_settings")
-                    .flex()
-                    .flex_row()
-                    .items_end()
-                    .justify_start()
-                    .border_t_1()
-                    .border_color(rgb(DARK_NEUTRAL_700))
-                    .h(px(ROW_HEIGHT))
-                    .p_4()
-                    .flex_shrink_0()
-                    .child(
-                        Icon::new(IconName::Settings)
-                            .size((px(28.), px(28.)))
-                            .text_color(rgb(AMBER_600)),
-                    )
-                    .child(
-                        div()
-                            .text_size(px(18.))
-                            .pl_2()
-                            .font_weight(FontWeight::NORMAL)
-                            .text_color(rgb(AMBER_600))
-                            .child("Settings"),
-                    )
-                    .on_click(ctx.listener(|_, _, _, _| {
-                        println!("settings clicked");
-                    })),
-            )
+            .child(self.render_settings_div(cx))
+            .into_any()
     }
 }
