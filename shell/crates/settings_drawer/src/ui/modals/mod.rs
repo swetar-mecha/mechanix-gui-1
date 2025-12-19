@@ -39,7 +39,6 @@ impl SettingsDrawer {
             .relative()
             .child(
                 div()
-                    .text_size(px(20.))
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(rgb(DARK_NEUTRAL_0))
                     .child(title),
@@ -66,7 +65,6 @@ impl SettingsDrawer {
             )
             .child(
                 div()
-                    .text_size(px(18.))
                     .pl_2()
                     .font_weight(FontWeight::NORMAL)
                     .text_color(rgb(AMBER_600))

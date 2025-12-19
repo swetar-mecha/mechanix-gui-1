@@ -1,15 +1,9 @@
-use futures::{SinkExt, channel::mpsc};
 use gpui::*;
 
 use crate::{
     prelude::*,
-    ui::{
-        icon::{Icon, IconName},
-        widgets::IconButton,
-    },
+    ui::icon::{Icon, IconName},
 };
-
-const ROW_HEIGHT: f32 = 60.0;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 enum OutputType {
@@ -100,7 +94,6 @@ impl SettingsDrawer {
                                     .flex()
                                     .flex_row()
                                     .text_color(rgb(AMBER_600))
-                                    .text_lg()
                                     .text_align(TextAlign::Left)
                                     .child(
                                         div().pr_2().child(
@@ -111,7 +104,6 @@ impl SettingsDrawer {
                                     )
                                     .child(
                                         div()
-                                            .text_lg()
                                             .pl_2()
                                             .font_weight(FontWeight::NORMAL)
                                             .text_color(icon_color)
@@ -142,7 +134,6 @@ impl SettingsDrawer {
                                     )
                                     .child(
                                         div()
-                                            .text_lg()
                                             .pl_2()
                                             .font_weight(FontWeight::NORMAL)
                                             .text_color(icon_color)

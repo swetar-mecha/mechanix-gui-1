@@ -26,17 +26,19 @@ const APP_SIZE: (f32, f32) = (540., 620.);
 
 const MIN_MODAL_SIZE_1: (f32, f32) = (133., 110.);
 const MIN_MODAL_SIZE_2: (f32, f32) = (203., 168.);
-const MIN_MODAL_SIZE_3: (f32, f32) = (332., 274.);
-const MIN_MODAL_SIZE_4: (f32, f32) = (424., 350.);
 const FINAL_MODAL_SIZE: (f32, f32) = (478., 392.);
 
-// const MODAL_SIZES: &'static [(f32, f32)] = &[
-//     MIN_MODAL_SIZE_1,
-//     MIN_MODAL_SIZE_2,
-//     MIN_MODAL_SIZE_3,
-//     MIN_MODAL_SIZE_4,
-//     FINAL_MODAL_SIZE,
-// ];
+const GRID_COLS: usize = 4;
+const GRID_ROWS: usize = 4;
+const ICON_W: f32 = 104.0;
+const ICON_H: f32 = 104.0;
+
+#[derive(PartialEq)]
+pub enum ModalAnimationState {
+    Opening,
+    Closing,
+    None,
+}
 
 pub enum PowerMode {
     High,
@@ -96,11 +98,14 @@ pub struct SettingsDrawer {
     pub volume_tx: mpsc::Sender<VolumeEvents>,
 
     pub open_modal: bool,
-    pub animating: bool,
     pub animation_progress: f32,
-    pub modal_opacity: f32, // TEMP: remove if not required
-    pub modal_sizes: Vec<(f32, f32)>,
+    pub animation_state: ModalAnimationState,
     pub modal_size: (f32, f32),
+
+    pub modal_start_center: (f32, f32),
+    pub modal_origin_center: (f32, f32),
+    pub modal_current_center: (f32, f32),
+    pub modal_target_center: (f32, f32),
 
     pub current_modal: ModalKind,
     pub wireless_modal_scroll: WirelessModalScroll,
@@ -246,11 +251,13 @@ impl SettingsDrawer {
             volume_tx,
 
             open_modal: false,
-            animating: false,
             animation_progress: 0.0,
-            modal_opacity: 0.5,
-            modal_sizes: vec![(MIN_MODAL_SIZE_1)],
+            animation_state: ModalAnimationState::None,
             modal_size: (MIN_MODAL_SIZE_1.0, MIN_MODAL_SIZE_1.1),
+            modal_start_center: (0.0, 0.0),
+            modal_origin_center: (0.0, 0.0),
+            modal_current_center: (0.0, 0.0),
+            modal_target_center: (0.0, 0.0),
 
             _subscriptions,
 
@@ -264,14 +271,49 @@ impl SettingsDrawer {
         }
     }
 
-    fn start_animation(&mut self, _event: &ClickEvent, _: &mut Window, cx: &mut Context<Self>) {
-        self.modal_size = MIN_MODAL_SIZE_1;
-        self.animating = true;
-        self.modal_opacity = 0.0;
+    fn start_animation(&mut self, event: &ClickEvent, _: &mut Window, cx: &mut Context<Self>) {
+        let mouse = event.mouse_position().unwrap();
 
-        self.animation_progress = 0.0; //  reset
-        self.modal_sizes.clear(); //  reset   
+        // Start from clicked icon center
+        self.modal_start_center = Self::clicked_item_center(mouse.x.into(), mouse.y.into());
+        self.modal_origin_center = self.modal_start_center;
+
+        self.modal_current_center = self.modal_start_center;
+
+        // End at APP center
+        self.modal_target_center = (APP_SIZE.0 / 2.0, APP_SIZE.1 / 2.0);
+
+        self.modal_size = MIN_MODAL_SIZE_1;
+        self.animation_progress = 0.0;
+        self.animation_state = ModalAnimationState::Opening;
+        self.open_modal = true;
+
         cx.notify();
+    }
+
+    fn start_close_animation(&mut self, cx: &mut Context<Self>) {
+        self.animation_progress = 1.0;
+        self.animation_state = ModalAnimationState::Closing;
+        cx.notify();
+    }
+
+    fn clicked_item_center(mouse_x: f32, mouse_y: f32) -> (f32, f32) {
+        let grid_w = GRID_COLS as f32 * ICON_W;
+        let grid_h = GRID_ROWS as f32 * ICON_H;
+
+        let origin_x = (APP_SIZE.0 - grid_w) / 2.0;
+        let origin_y = (APP_SIZE.1 - grid_h) / 2.0;
+
+        let local_x = (mouse_x - origin_x).clamp(0.0, grid_w - 1.0);
+        let local_y = (mouse_y - origin_y).clamp(0.0, grid_h - 1.0);
+
+        let col = (local_x / ICON_W).floor() as usize;
+        let row = (local_y / ICON_H).floor() as usize;
+
+        (
+            origin_x + col as f32 * ICON_W + ICON_W / 2.0,
+            origin_y + row as f32 * ICON_H + ICON_H / 2.0,
+        )
     }
 }
 
@@ -425,354 +467,243 @@ impl SettingsDrawer {
     ) -> impl IntoElement {
         let window_bounds = window.bounds();
 
-        if self.animating {
-            self.open_modal = true;
-            self.animation_progress += 0.405;
-
-            //   self.modal_opacity += 0.005;
-            //      if self.modal_opacity >= 1.0 {
-            //         self.animating = false;
-            //         self.modal_opacity = 1.0;
-            //     } else {
-            //         window.request_animation_frame();
-            //     }
-
-            self.modal_sizes.clear();
-            let mut step = (self.animation_progress * 5.0).floor() as usize;
-
-            if step >= 1 {
-                self.modal_sizes.push(MIN_MODAL_SIZE_1);
-            }
-            if step >= 2 {
-                self.modal_sizes.push(MIN_MODAL_SIZE_2);
-            }
-            if step >= 3 {
-                self.modal_sizes.push(MIN_MODAL_SIZE_3);
-            }
-            if step >= 4 {
-                self.modal_sizes.push(MIN_MODAL_SIZE_4);
-            }
-            if step >= 5 {
-                self.modal_sizes.push(FINAL_MODAL_SIZE);
-                self.animating = false;
+        if matches!(
+            self.animation_state,
+            ModalAnimationState::Opening | ModalAnimationState::Closing
+        ) {
+            match self.animation_state {
+                ModalAnimationState::Opening => {
+                    self.animation_progress += 0.08;
+                }
+                ModalAnimationState::Closing => {
+                    self.animation_progress -= 0.08;
+                }
+                _ => {}
             }
 
-            if self.animation_progress >= 1.0 {
-                self.modal_sizes = vec![FINAL_MODAL_SIZE];
+            let t = self.animation_progress.clamp(0.0, 1.0);
+
+            let ease = 1.0 - (1.0 - t).powi(3);
+
+            // Center interpolation
+            self.modal_current_center = (
+                self.modal_origin_center.0
+                    + (self.modal_target_center.0 - self.modal_origin_center.0) * ease,
+                self.modal_origin_center.1
+                    + (self.modal_target_center.1 - self.modal_origin_center.1) * ease,
+            );
+
+            // Size interpolation
+            self.modal_size = (
+                MIN_MODAL_SIZE_1.0 + (FINAL_MODAL_SIZE.0 - MIN_MODAL_SIZE_1.0) * ease,
+                MIN_MODAL_SIZE_1.1 + (FINAL_MODAL_SIZE.1 - MIN_MODAL_SIZE_1.1) * ease,
+            );
+
+            // End conditions
+            if self.animation_state == ModalAnimationState::Opening && t >= 1.0 {
+                self.animation_state = ModalAnimationState::None;
+                self.modal_current_center = self.modal_target_center;
+                self.modal_size = FINAL_MODAL_SIZE;
+            } else if self.animation_state == ModalAnimationState::Closing && t <= 0.0 {
+                self.animation_state = ModalAnimationState::None;
+                self.open_modal = false;
+                self.modal_current_center = self.modal_origin_center;
+                self.modal_size = MIN_MODAL_SIZE_1;
             } else {
                 window.request_animation_frame();
             }
         }
 
-        let modal_sizes = self.modal_sizes.clone();
-
         div()
-            .id("main_container")
-            .flex()
-            .flex_col()
+            .id("root")
+            .relative()
             .w(px(APP_SIZE.0))
             .h(px(APP_SIZE.1))
-            .px_8()
-            .bg(rgb(DARK_NEUTRAL_1000))
             .child(
-                // status row
                 div()
-                    .w_full()
+                    .id("main_container")
                     .flex()
-                    .h(px(32.82))
-                    .mt_7()
-                    .py_1()
-                    .items_center()
-                    .justify_between()
+                    .flex_col()
+                    .w_full()
+                    .h_full()
+                    .px_8()
+                    .bg(rgb(DARK_NEUTRAL_1000))
                     .child(
+                        // status row
                         div()
-                            .flex()
-                            .flex_row()
-                            .child(self.current_time_date.clone())
-                            .text_xl()
-                            .text_color(rgb(TEXT_COLOR)),
-                    )
-                    .child(self.render_power_button(cx)),
-            )
-            .child(
-                div()
-                    .grid()
-                    .grid_rows(2)
-                    .grid_cols(4)
-                    .pt_4()
-                    .gap_4()
-                    .content_center()
-                    .rounded(px(12.))
-                    .child(self.render_rotation(cx))
-                    .child(self.render_airplane_mode(cx))
-                    .child(self.render_screen_mirroring(cx))
-                    .child(self.render_terminal(cx))
-                    .child(self.render_microphone_recording(cx))
-                    .child(self.render_screen_recording(cx))
-                    .child(self.render_settings(cx))
-                    .child(self.render_camera(cx)),
-            )
-            .child(
-                div()
-                    .grid()
-                    .grid_rows(2)
-                    .grid_cols(4)
-                    .pt_4()
-                    .gap_4()
-                    .content_center()
-                    .rounded(px(12.))
-                    .child(self.render_wireless(cx))
-                    .child(self.render_bluetooth(cx))
-                    .child(self.render_battery_performance(cx))
-                    .child(self.render_cell_signal(cx))
-                    .child(self.render_brightness_control_div(cx))
-                    .child(
-                        div()
-                            .id("id_sound")
-                            .flex()
-                            .items_center()
-                            .justify_center()
                             .w_full()
-                            .h_full()
-                            .text_lg()
-                            .col_span(2)
-                            .bg(rgb(DARK_NEUTRAL_900))
-                            .rounded(px(8.))
-                            // .on_click(cx.listener(
-                            //     move |_,
-                            //     _event: &ClickEvent,
-                            //     _window: &mut Window,
-                            //     cx: &mut Context<Self>| {
-                            //         let popup_bounds = Bounds::centered(None, size(px(476.0), px(400.0)), cx);
-                            //         cx.open_window(
-                            //         WindowOptions {
-                            //             titlebar: None,
-                            //             kind: WindowKind::PopUp,
-                            //             is_movable: false,
-                            //             window_bounds:Some(
-                            //                     WindowBounds::Windowed(
-                            //                         popup_bounds,
-                            //                     ),
-                            //                 ),
-                            //             ..Default::default()
-                            //         },
-                            //         |_, cx| {
-                            //             cx.new(|_|
-                            //                 SoundWindow::new("Sound".to_string())
-                            //             )
-                            //         },
-                            //         ).unwrap();
-                            //     },
-                            // ))
-                            .child(self.render_volume_control(cx)),
-                    ),
-            )
-            .when(self.open_modal, |content_div| {
-                content_div
-                    .relative()
-                    .child(
-                        div()
-                            .id("modal-bg")
-                            .absolute()
                             .flex()
+                            .h(px(32.82))
+                            .mt_7()
+                            .py_1()
                             .items_center()
-                            .justify_center()
-                            .top(px(0.))
-                            .left(px(0.))
-                            .w_full()
-                            .h_full()
-                            .bg(rgb(0x000000))
-                            .opacity(0.6)
-                            .on_click(cx.listener(|this: &mut SettingsDrawer, _, _, cx| {
-                                this.open_modal = false;
-                                this.animation_progress = 0.0; // Reset 
-                                this.modal_sizes.clear();
-                                cx.notify();
-                            }))
-                            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                            .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation()),
-                    )
-                    .child(
-                        div()
-                            .id("modal-container")
-                            .absolute()
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .top(px(0.))
-                            .left(px(0.))
-                            .w_full()
-                            .h_full()
-                            // .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                            // .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                            // .on_click(|_, _, cx| cx.stop_propagation())
-                            .children(modal_sizes.iter().enumerate().map(|(idx, &(w, h))| {
-                                let w = w.clone();
-                                let h = h.clone();
+                            .justify_between()
+                            .child(
                                 div()
-                                    .id(("modal-item", idx))
+                                    .flex()
+                                    .flex_row()
+                                    .child(self.current_time_date.clone())
+                                    .text_xl()
+                                    .text_color(rgb(TEXT_COLOR)),
+                            )
+                            .child(self.render_power_button(cx)),
+                    )
+                    .child(
+                        div()
+                            .grid()
+                            .grid_rows(2)
+                            .grid_cols(4)
+                            .pt_4()
+                            .gap_4()
+                            .content_center()
+                            .rounded(px(12.))
+                            .child(self.render_rotation(cx))
+                            .child(self.render_airplane_mode(cx))
+                            .child(self.render_screen_mirroring(cx))
+                            .child(self.render_terminal(cx))
+                            .child(self.render_microphone_recording(cx))
+                            .child(self.render_screen_recording(cx))
+                            .child(self.render_settings(cx))
+                            .child(self.render_camera(cx)),
+                    )
+                    .child(
+                        div()
+                            .grid()
+                            .grid_rows(2)
+                            .grid_cols(4)
+                            .pt_4()
+                            .gap_4()
+                            .content_center()
+                            .rounded(px(12.))
+                            .child(self.render_wireless(cx))
+                            .child(self.render_bluetooth(cx))
+                            .child(self.render_battery_performance(cx))
+                            .child(self.render_cell_signal(cx))
+                            .child(self.render_brightness_control_div(cx))
+                            .child(
+                                div()
+                                    .id("id_sound")
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .w_full()
+                                    .h_full()
+                                    .text_lg()
+                                    .col_span(2)
+                                    .bg(rgb(DARK_NEUTRAL_900))
+                                    .rounded(px(8.))
+                                    .child(self.render_volume_control(cx)),
+                            ),
+                    )
+                    .when(self.open_modal, |content_div| {
+                        content_div
+                            .relative()
+                            .child(
+                                div()
+                                    .id("modal-bg")
                                     .absolute()
                                     .flex()
-                                    .w(px(w))
-                                    .h(px(h))
-                                    .bg(rgb(DARK_NEUTRAL_900))
-                                    .rounded_xl()
-                                    .border_1()
-                                    .border_color(rgb(AMBER_800))
+                                    .items_center()
+                                    .justify_center()
+                                    .top(px(0.))
+                                    .left(px(0.))
+                                    .w_full()
+                                    .h_full()
+                                    .bg(rgb(0x000000))
+                                    .opacity(0.6)
+                                    .on_click(cx.listener(
+                                        |this: &mut SettingsDrawer, _, widnow, cx| {
+                                            Self::start_close_animation(this, cx);
+                                        },
+                                    ))
                                     .on_mouse_down(MouseButton::Left, |_, _, cx| {
                                         cx.stop_propagation()
                                     })
                                     .on_mouse_up(MouseButton::Left, |_, _, cx| {
                                         cx.stop_propagation()
-                                    })
-                                    .on_click(|_, _, cx| cx.stop_propagation())
-                                    .when(!self.animating && w == FINAL_MODAL_SIZE.0, |this| {
-                                        this.child(
-                                            // div()
-                                            //     .flex()
-                                            //     .flex_row()
-                                            //     .items_center()
-                                            //     .justify_between()
-                                            //     .w_full()
-                                            //     .h(px(30.))
-                                            //     .border_b_1()
-                                            //     .bg(rgb(DARK_NEUTRAL_800))
-                                            //     .flex_shrink_0()
-                                            //     .child(
-                                            //         div()
-                                            //             .text_size(px(20.))
-                                            //             .font_weight(FontWeight::SEMIBOLD)
-                                            //             .text_color(rgb(DARK_NEUTRAL_0))
-                                            //             .child("Extended screen".to_string()),
-                                            //     ),
-                                            match self.current_modal {
-                                                ModalKind::ScreenMirroring => {
-                                                    self.render_extended_screen_options(cx)
-                                                }
-                                                ModalKind::WirelessModal => {
-                                                    self.render_wireless_modal(cx)
-                                                }
-                                                ModalKind::BluetoothModal => {
-                                                    self.render_bluetooth_modal(cx)
-                                                }
-                                                ModalKind::SoundModal => {
-                                                    self.render_sound_modal(cx)
-                                                }
-                                                ModalKind::PerformanceModal => {
-                                                    println!("performance modal requested...");
-                                                    self.render_battery_performance_modal(cx)
-                                                }
-                                                ModalKind::DisplayModal => {
-                                                    self.render_display_modal(cx)
-                                                }
-                                                ModalKind::None => Empty.into_any(),
-                                            },
-                                        )
-                                    })
-                            })),
-                    )
-                // .child( // single
-                //     div()
-                //     .absolute()
-                //     .flex()
-                //     .justify_center()
-                //     .items_center()
-                //     .top(px(0.))
-                //     .left(px(0.))
-                //     .w_full()
-                //     .h_full()
-                //     .child(
-                //            div()
-                //             .id("id_modal")
-                //             .w(px(self.modal_size.0))
-                //             .h(px(self.modal_size.1))
-                //             .bg(rgb(DARK_NEUTRAL_900))
-                //             .rounded(px(4.))
-                //             .border(px(1.))
-                //             .border_color(rgb(AMBER_800))
-                //             // .opacity(self.modal_opacity)
-                //             // // Prevents click from reaching background
-                //             // .on_click(cx.listener(|this: &mut SettingsDrawer, _, _, cx| {
-                //             //     this.open_modal = false;
-                //             //     cx.notify();
-                //             // }))
-                //             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                //             .on_mouse_up(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                //             .on_click(|_, _, cx| cx.stop_propagation())
-                //             .child(
-                //                 // Header
-                //                 div()
-                //                     .flex()
-                //                     .flex_row()
-                //                     .items_center()
-                //                     .justify_between()
-                //                     .w_full()
-                //                     .h(px(30.))
-                //                     .border_b_1()
-                //                     .bg(rgb(DARK_NEUTRAL_800))
-                //                     .flex_shrink_0()
-                //                     .child(
-                //                         //  cx.new(|_| {
-                //                         //     ExtendScreenOptions::new()
-                //                         //         .on_option_click(|extend_type| {
-                //                         //             println!("Option selected: {:?}", extend_type);
-                //                         //         })
-                //                         //         .on_settings_click(|| {
-                //                         //             println!("Settings clicked");
-                //                         //         })
-                //                         // })
-                //                         div()
-                //                             .text_size(px(20.))
-                //                             .font_weight(FontWeight::SEMIBOLD)
-                //                             .text_color(rgb(DARK_NEUTRAL_0))
-                //                             .child("Extended screen".to_string()),
-
-                //                         // Render ExtendScreenOptions chere
-                //                     ),
-                //             ),
-                //     )
-                // )
-            })
+                                    }),
+                            )
+                            .child(
+                                div()
+                                    .id("modal-container")
+                                    .absolute()
+                                    .left(px(0.))
+                                    .top(px(0.))
+                                    .size_full()
+                                    .child(
+                                        div()
+                                            .id("modal-item")
+                                            .absolute()
+                                            .flex()
+                                            .left(px(self.modal_current_center.0
+                                                - self.modal_size.0 / 2.0))
+                                            .top(px(self.modal_current_center.1
+                                                - self.modal_size.1 / 2.0))
+                                            .w(px(self.modal_size.0))
+                                            .h(px(self.modal_size.1))
+                                            .bg(if self.modal_size.0 == MIN_MODAL_SIZE_1.0 {
+                                                rgba(AMBER_600_10)
+                                            } else {
+                                                rgb(DARK_NEUTRAL_900)
+                                            })
+                                            .text_size(if self.modal_size != FINAL_MODAL_SIZE {
+                                                px(16.)
+                                            } else {
+                                                px(18.)
+                                            })
+                                            .rounded_xl()
+                                            .border_1()
+                                            .border_color(rgb(AMBER_800))
+                                            .on_mouse_down(MouseButton::Left, |_, _, cx| {
+                                                cx.stop_propagation()
+                                            })
+                                            .on_mouse_up(MouseButton::Left, |_, _, cx| {
+                                                cx.stop_propagation()
+                                            })
+                                            .on_click(|_, _window, cx| cx.stop_propagation())
+                                            .when(self.modal_size > MIN_MODAL_SIZE_2, |this| {
+                                                this.child(match self.current_modal {
+                                                    ModalKind::ScreenMirroring => {
+                                                        self.render_extended_screen_options(cx)
+                                                    }
+                                                    ModalKind::WirelessModal => {
+                                                        self.render_wireless_modal(cx)
+                                                    }
+                                                    ModalKind::BluetoothModal => {
+                                                        self.render_bluetooth_modal(cx)
+                                                    }
+                                                    ModalKind::SoundModal => {
+                                                        self.render_sound_modal(cx)
+                                                    }
+                                                    ModalKind::PerformanceModal => {
+                                                        self.render_battery_performance_modal(cx)
+                                                    }
+                                                    ModalKind::DisplayModal => {
+                                                        self.render_display_modal(cx)
+                                                    }
+                                                    ModalKind::None => Empty.into_any(),
+                                                })
+                                            }),
+                                    ),
+                            )
+                    }),
+            )
     }
 
     fn render_power_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        div().id("id_power").child(
-            Icon::new(IconName::Power)
-                .text_color(rgb(0xF4F4F4))
-                .size((px(24.), px(24.))),
-        )
-        // .on_click(cx.listener(
-        //     move |_,
-        //             _event: &ClickEvent,
-        //             _window: &mut Window,
-        //             cx: &mut Context<Self>| {
-        //         println!("power clicked");
-
-        //         let popup_origin =
-        //             point(window_bounds.origin.x, window_bounds.origin.y);
-
-        //         let popup_bounds = Bounds {
-        //             origin: popup_origin,
-        //             size: size(px(476.0), px(180.0)),
-        //         };
-
-        //         cx.open_window(
-        //             WindowOptions {
-        //                 titlebar: None,
-        //                 kind: WindowKind::PopUp,
-        //                 is_movable: false,
-        //                 window_bounds: Some(WindowBounds::Windowed(
-        //                     popup_bounds,
-        //                 )),
-        //                 ..Default::default()
-        //             },
-        //             |_, cx| {
-        //                 cx.new(|_| BatteryWindow::new("Battery".to_string()))
-        //             },
-        //         )
-        //         .unwrap();
-        //     },
-        // )),
+        div()
+            .id("id_power")
+            .child(
+                Icon::new(IconName::Power)
+                    .text_color(rgb(0xF4F4F4))
+                    .size((px(24.), px(24.))),
+            )
+            .on_click(cx.listener(
+                move |_, _event: &ClickEvent, _window: &mut Window, cx: &mut Context<Self>| {
+                    println!("power clicked");
+                    cx.notify();
+                },
+            ))
     }
 
     fn render_rotation(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -807,20 +738,20 @@ impl SettingsDrawer {
             .active(self.airplane_mode)
             .active_icon_color(rgb(DARK_NEUTRAL_0))
             .active_bg_color(rgb(AMBER_600))
-        // .on_click(cx.listener(
-        //     |this: &mut SettingsDrawer,
-        //      _event: &ClickEvent,
-        //      _window: &mut Window,
-        //      cx: &mut Context<Self>| {
-        //         println!("airplane button clicked");
-        //         this.airplane_mode = !this.airplane_mode;
-        //         cx.notify();
-        //     },
-        // )),
+            .on_click(cx.listener(
+                |this: &mut SettingsDrawer,
+                 _event: &ClickEvent,
+                 _window: &mut Window,
+                 cx: &mut Context<Self>| {
+                    println!("airplane button clicked");
+                    this.airplane_mode = !this.airplane_mode;
+                    cx.notify();
+                },
+            ))
     }
 
     fn render_screen_mirroring(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        // Add extened screen icons when extended screen is detected
+        // TODO: Add extened screen icons when extended screen is detected
         let screen_mirroring_icon = if self.screen_mirroring {
             IconName::ScreenMirroringOn
         } else {
@@ -833,8 +764,7 @@ impl SettingsDrawer {
             .active(self.screen_mirroring)
             .active_icon_color(rgb(AMBER_600))
             .active_bg_color(rgba(AMBER_600_10))
-            // .on_click(cx.listener(
-            //     // toggle
+            // .on_click(cx.listener( // keep this
             //     |this: &mut SettingsDrawer,
             //      _event: &MouseUpEvent,
             //      _window: &mut Window,
@@ -844,35 +774,11 @@ impl SettingsDrawer {
             //     },
             // ))
             .on_click(cx.listener(
-                // long press
+                // TODO: add long press
                 move |this: &mut SettingsDrawer,
                       _event: &ClickEvent,
                       _window: &mut Window,
                       cx: &mut Context<Self>| {
-                    // let popup_bounds = Bounds::centered(None, size(px(MODAL_SIZE.0), px(MODAL_SIZE.1)), cx);
-
-                    // cx.open_window(
-                    // WindowOptions {
-                    //     titlebar: None,
-                    //     kind: WindowKind::PopUp,
-                    //     is_movable: false,
-                    //     window_bounds:Some(
-                    //             WindowBounds::Windowed(
-                    //                 popup_bounds,
-                    //             ),
-                    //         ),
-                    //     ..Default::default()
-                    // },
-                    // |_, cx| {
-                    //     cx.new(|_|
-                    //         ExtendScreenOptions::new("Extended Screen".to_string())
-                    //     )
-                    // },
-                    // ).unwrap();
-
-                    // this.open_modal = !this.open_modal;
-                    // this.screen_mirroring = !this.screen_mirroring;
-                    println!("long press started");
                     this.current_modal = ModalKind::ScreenMirroring;
                     Self::start_animation(this, _event, _window, cx);
 
@@ -903,15 +809,15 @@ impl SettingsDrawer {
             .active(self.microphone_recording)
             .active_icon_color(rgb(AMBER_600))
             .active_bg_color(rgba(AMBER_600_10))
-        // .on_click(cx.listener(
-        //     |this: &mut SettingsDrawer,
-        //     _event: &ClickEvent,
-        //     _window: &mut Window,
-        //     cx: &mut Context<Self>| {
-        //         this.microphone_recording = !this.microphone_recording;
-        //         cx.notify();
-        //     },
-        // )),
+            .on_click(cx.listener(
+                |this: &mut SettingsDrawer,
+                 _event: &ClickEvent,
+                 _window: &mut Window,
+                 cx: &mut Context<Self>| {
+                    this.microphone_recording = !this.microphone_recording;
+                    cx.notify();
+                },
+            ))
     }
 
     fn render_screen_recording(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -921,15 +827,15 @@ impl SettingsDrawer {
             .active(self.screen_recording)
             .active_icon_color(rgb(AMBER_600))
             .active_bg_color(rgba(AMBER_600_10))
-        // .on_click(cx.listener(
-        //     |this: &mut SettingsDrawer,
-        //     _event: &ClickEvent,
-        //     _window: &mut Window,
-        //     cx: &mut Context<Self>| {
-        //         this.screen_recording = !this.screen_recording;
-        //         cx.notify();
-        //     },
-        // )),
+            .on_click(cx.listener(
+                |this: &mut SettingsDrawer,
+                 _event: &ClickEvent,
+                 _window: &mut Window,
+                 cx: &mut Context<Self>| {
+                    this.screen_recording = !this.screen_recording;
+                    cx.notify();
+                },
+            ))
     }
 
     fn render_settings(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -938,15 +844,12 @@ impl SettingsDrawer {
             .size((px(104.), px(88.)))
             .active_icon_color(rgb(AMBER_600))
             .active_bg_color(rgba(AMBER_600_10))
-        // .on_click(cx.listener(
-        //     |_,
-        //     _event: &ClickEvent,
-        //     _window: &mut Window,
-        //     cx: &mut Context<Self>| {
-        //         println!("settigns clicked");
-        //         cx.notify();
-        //     },
-        // )),
+            .on_click(cx.listener(
+                |_, _event: &ClickEvent, _window: &mut Window, cx: &mut Context<Self>| {
+                    println!("settigns clicked");
+                    cx.notify();
+                },
+            ))
     }
 
     fn render_camera(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -957,15 +860,12 @@ impl SettingsDrawer {
             .icon_color(rgb(DARK_NEUTRAL_100))
             .active_icon_color(rgb(AMBER_600))
             .active_bg_color(rgba(AMBER_600_10))
-        // .on_click(cx.listener(
-        //     |_,
-        //     _event: &ClickEvent,
-        //     _window: &mut Window,
-        //     cx: &mut Context<Self>| {
-        //         println!("camera clicked");
-        //         cx.notify();
-        //     },
-        // )),
+            .on_click(cx.listener(
+                |_, _event: &ClickEvent, _window: &mut Window, cx: &mut Context<Self>| {
+                    println!("camera clicked");
+                    cx.notify();
+                },
+            ))
     }
 
     fn render_wireless(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -989,6 +889,7 @@ impl SettingsDrawer {
                 get_wireless_strength_icon(wireless_enable, signal_strength, "Open".to_string()) // intentionally open as no lock to show in view
             };
         }
+
         IconButton::new("id_wireless")
             .icon(Icon::new(wireless_icon).size((px(36.), px(36.))))
             .size((px(104.), px(104.)))
@@ -997,7 +898,7 @@ impl SettingsDrawer {
             .active_icon_color(rgb(AMBER_600))
             .active_bg_color(rgba(AMBER_600_10))
             // // 10% - ok - keeping while it is active
-            // .on_click(cx.listener(
+            // .on_click(cx.listener(  // KEEP THIS
             //     |this: &mut SettingsDrawer,
             //      _event: &ClickEvent,
             //      _window: &mut Window,
@@ -1016,13 +917,13 @@ impl SettingsDrawer {
             //     },
             // )),
             .on_click(cx.listener(
-                // TEMP; TODO: long press open modal
+                // TODO: long press open modal
                 move |this: &mut SettingsDrawer,
                       _event: &ClickEvent,
-                      _window: &mut Window,
+                      window: &mut Window,
                       cx: &mut Context<Self>| {
                     this.current_modal = ModalKind::WirelessModal;
-                    Self::start_animation(this, _event, _window, cx);
+                    Self::start_animation(this, _event, window, cx);
                 },
             ))
     }
@@ -1053,7 +954,7 @@ impl SettingsDrawer {
             .active(self.bluetooth_details.enabled)
             .active_icon_color(rgb(AMBER_600))
             .active_bg_color(rgba(AMBER_600_10))
-            // .on_click(cx.listener(
+            // .on_click(cx.listener(  // KEEP THIS
             //     |this: &mut SettingsDrawer,
             //      _event: &ClickEvent,
             //      _window: &mut Window,
@@ -1072,12 +973,11 @@ impl SettingsDrawer {
             //     },
             // )),
             .on_click(cx.listener(
-                // TEMP; TODO: long press open modal
+                // TODO: add long press open modal
                 move |this: &mut SettingsDrawer,
                       _event: &ClickEvent,
                       _window: &mut Window,
                       cx: &mut Context<Self>| {
-                    println!("bluetooth clicked");
                     this.current_modal = ModalKind::BluetoothModal;
                     Self::start_animation(this, _event, _window, cx);
                 },
@@ -1091,9 +991,9 @@ impl SettingsDrawer {
             PowerMode::Low => IconName::PowerModeLow,
         };
         let power_mode_icon_color = match self.power_mode {
-            PowerMode::High => rgb(AMBER_600),            // blue
-            PowerMode::Balanced => rgb(DARK_NEUTRAL_100), // gray
-            PowerMode::Low => rgb(AMBER_600),             // yellow
+            PowerMode::High => rgb(AMBER_600),
+            PowerMode::Balanced => rgb(DARK_NEUTRAL_100),
+            PowerMode::Low => rgb(AMBER_600),
         };
         IconButton::new("id_power_mode")
             .icon(power_mode_icon)
@@ -1121,16 +1021,16 @@ impl SettingsDrawer {
             .active(self.cell_signal)
             .active_icon_color(rgb(AMBER_600))
             .active_bg_color(rgba(AMBER_600_10))
-        // .on_click(cx.listener(
-        //     |this: &mut SettingsDrawer,
-        //     _event: &ClickEvent,
-        //     _window: &mut Window,
-        //     cx: &mut Context<Self>| {
-        //         println!("cell_signal clicked");
-        //         this.cell_signal = !this.cell_signal;
-        //         cx.notify();
-        //     },
-        // )),
+            .on_click(cx.listener(
+                |this: &mut SettingsDrawer,
+                 _event: &ClickEvent,
+                 _window: &mut Window,
+                 cx: &mut Context<Self>| {
+                    println!("cell_signal clicked");
+                    this.cell_signal = !this.cell_signal;
+                    cx.notify();
+                },
+            ))
     }
 
     fn render_brightness_control_div(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -1182,31 +1082,7 @@ impl SettingsDrawer {
                     .size((px(32.), px(32.)))
                     .bg_color(rgb(DARK_NEUTRAL_900))
                     .active_bg_color(rgb(DARK_NEUTRAL_900))
-                    .border(px(0.)), //     .on_click(cx.listener(  // todo: show modal on long press
-                                     //             move |this: &mut SettingsDrawer,
-                                     //             _event: &ClickEvent,
-                                     //             _window: &mut Window,
-                                     //             cx: &mut Context<Self>| {
-                                     //                 let popup_bounds = Bounds::centered(None, size(px(MODAL_SIZE.0), px(MODAL_SIZE.1)), cx);
-                                     //                 cx.open_window(
-                                     //                 WindowOptions {
-                                     //                     titlebar: None,
-                                     //                     kind: WindowKind::PopUp,
-                                     //                     is_movable: false,
-                                     //                     window_bounds:Some(
-                                     //                             WindowBounds::Windowed(
-                                     //                                 popup_bounds,
-                                     //                             ),
-                                     //                         ),
-                                     //                     ..Default::default()
-                                     //                         },
-                                     //                         |_, cx| {
-                                     //                             cx.new(|_|
-                                     //                                 DisplayWindow::new("Display brightness".to_string(), this.auto_brightness, this.dark_mode)
-                                     //                             )
-                                     //                         }).unwrap();
-                                     //                     },
-                                     // ))
+                    .border(px(0.)),
             )
             .child(
                 div()
@@ -1214,6 +1090,7 @@ impl SettingsDrawer {
                     .justify_center()
                     .items_center()
                     .w(px(width))
+                    .pl_2()
                     .child(
                         Slider::new("brightness-slider", &self.brightness_slider_state)
                             .height(66.0)
@@ -1249,7 +1126,7 @@ impl SettingsDrawer {
             .justify_start()
             .pl_2()
             .on_click(cx.listener(
-                // TEMP; TODO: long press open modal
+                //  TODO: long press open modal
                 move |this: &mut SettingsDrawer,
                       _event: &ClickEvent,
                       _window: &mut Window,

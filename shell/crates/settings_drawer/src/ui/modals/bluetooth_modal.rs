@@ -215,7 +215,6 @@ impl SettingsDrawer {
                                                 .child(
                                                     div()
                                                     .text_color(icon_color)
-                                                    .text_lg()
                                                     .child(name.clone())
                                                 ),
                                         )
@@ -251,7 +250,6 @@ impl SettingsDrawer {
                                                  .child(
                                                     div()
                                                     .text_color(icon_color)
-                                                    .text_lg()
                                                     .child(name.clone())
                                                 ),
                                         )

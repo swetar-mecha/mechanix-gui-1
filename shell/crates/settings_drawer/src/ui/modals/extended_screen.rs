@@ -1,12 +1,9 @@
 use gpui::*;
-use std::rc::Rc;
 
 use crate::{
     prelude::*,
     ui::icon::{Icon, IconName},
 };
-
-const ROW_HEIGHT: f32 = 60.0;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum ExtendedType {
@@ -115,7 +112,6 @@ impl SettingsDrawer {
                                     )
                                     .child(
                                         div()
-                                            .text_lg()
                                             .pl_2()
                                             .font_weight(FontWeight::NORMAL)
                                             .text_color(icon_color)
@@ -146,7 +142,6 @@ impl SettingsDrawer {
                                     )
                                     .child(
                                         div()
-                                            .text_lg()
                                             .pl_2()
                                             .font_weight(FontWeight::NORMAL)
                                             .text_color(icon_color)

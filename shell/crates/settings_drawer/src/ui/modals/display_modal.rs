@@ -32,7 +32,7 @@ impl SettingsDrawer {
                             .flex_row()
                             .justify_start()
                             .items_start()
-                            .pl_4()
+                            .pl_2()
                             .py_6()
                             .child(self.render_brightness_slider(cx, 391.)),
                     )
@@ -58,7 +58,6 @@ impl SettingsDrawer {
                                     )
                                     .child(
                                         div()
-                                            .text_lg()
                                             .pl_2()
                                             .font_weight(FontWeight::NORMAL)
                                             .text_color(rgb(AMBER_600))
@@ -97,7 +96,6 @@ impl SettingsDrawer {
                                     )
                                     .child(
                                         div()
-                                            .text_lg()
                                             .pl_2()
                                             .font_weight(FontWeight::NORMAL)
                                             .text_color(rgb(DARK_NEUTRAL_0))

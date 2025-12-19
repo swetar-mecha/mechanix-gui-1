@@ -223,7 +223,6 @@ impl SettingsDrawer {
                                                 )
                                                 .child(
                                                     div()
-                                                    .text_lg()
                                                     .pl_2()
                                                     .font_weight(FontWeight::NORMAL)
                                                     .text_color(icon_color)
@@ -255,7 +254,6 @@ impl SettingsDrawer {
                                                 )
                                                 .child(
                                                     div()
-                                                    .text_lg()
                                                     .pl_2()
                                                     .font_weight(FontWeight::NORMAL)
                                                     .text_color(icon_color)
