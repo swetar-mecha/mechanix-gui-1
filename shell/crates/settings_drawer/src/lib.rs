@@ -11,40 +11,58 @@ pub mod prelude {
 
 use crate::ui::icon::IconName;
 
-pub fn get_wireless_strength_icon(enable: bool, signal_strength: u8, security: String) -> IconName {
-    if enable {
-        match security.as_str() {
-            "Open" => match signal_strength {
-                0 => IconName::ConnectedWifiOn,
-                0..=30 => IconName::ConnectedWifiLow,
-                31..=60 => IconName::ConnectedWifiMedium,
-                61..=100 => IconName::ConnectedWifiHigh,
+pub fn get_wireless_strength_icon(
+    enabled: bool,
+    signal_strength: u8,
+    security: String,
+) -> IconName {
+    let level = if signal_strength == 0 {
+        "none"
+    } else if signal_strength <= 30 {
+        "low"
+    } else if signal_strength <= 60 {
+        "medium"
+    } else if signal_strength <= 100 {
+        "high"
+    } else {
+        "unknown"
+    };
+
+    let is_protected = security == "Protected";
+
+    if enabled {
+        if is_protected {
+            match level {
+                "low" => IconName::ConnectedWifiLowLocked,
+                "medium" => IconName::ConnectedWifiMediumLocked,
+                "high" => IconName::ConnectedWifiHighLocked,
                 _ => IconName::ConnectedWifiWarning,
-            },
-            "Protected" => match signal_strength {
-                0..=30 => IconName::ConnectedWifiLowLocked,
-                31..=60 => IconName::ConnectedWifiMediumLocked,
-                61..=100 => IconName::ConnectedWifiHighLocked,
+            }
+        } else {
+            match level {
+                "none" => IconName::ConnectedWifiOn,
+                "low" => IconName::ConnectedWifiLow,
+                "medium" => IconName::ConnectedWifiMedium,
+                "high" => IconName::ConnectedWifiHigh,
                 _ => IconName::ConnectedWifiWarning,
-            },
-            _ => IconName::ConnectedWifiWarning,
+            }
         }
     } else {
-        match security.as_str() {
-            "Open" => match signal_strength {
-                0 => IconName::WifiOn,
-                0..=30 => IconName::WifiLow,
-                31..=60 => IconName::WifiMedium,
-                61..=100 => IconName::WifiHigh,
+        if is_protected {
+            match level {
+                "low" => IconName::WifiLowLocked,
+                "medium" => IconName::WifiMediumLocked,
+                "high" => IconName::WifiHighLocked,
                 _ => IconName::WifiWarning,
-            },
-            "Protected" => match signal_strength {
-                0..=30 => IconName::WifiLowLocked,
-                31..=60 => IconName::WifiMediumLocked,
-                61..=100 => IconName::WifiHighLocked,
+            }
+        } else {
+            match level {
+                "none" => IconName::WifiOn,
+                "low" => IconName::WifiLow,
+                "medium" => IconName::WifiMedium,
+                "high" => IconName::WifiHigh,
                 _ => IconName::WifiWarning,
-            },
-            _ => IconName::WifiWarning,
+            }
         }
     }
 }

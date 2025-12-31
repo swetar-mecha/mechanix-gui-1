@@ -86,7 +86,7 @@ fn main() {
                                 event = nm_rx.next() => {
                                     if let Some(event) = event  {
                                         match event {
-                                            NmEvents::WirelessToggle{enabled}=>{let _=network_manager.toggle_wireless(enabled).await;}
+                                            NmEvents::WirelessToggle{enabled}=>{let _= network_manager.toggle_wireless(enabled).await;}
                                             NmEvents::ConnectKnownNetwork { name } => {
                                                 let _ = network_manager.connect_to_saved_network(&name.clone()).await;
                                             },

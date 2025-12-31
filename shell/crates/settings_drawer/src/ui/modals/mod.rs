@@ -4,6 +4,7 @@ pub mod bluetooth_modal;
 pub mod display_modal;
 pub mod extended_screen;
 pub mod performance_modal;
+pub mod power_off;
 pub mod sound_modal;
 pub mod wireless_modal;
 
