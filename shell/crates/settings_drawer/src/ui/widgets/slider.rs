@@ -106,6 +106,7 @@ impl SliderState {
             return;
         } else {
             self.value = new_value;
+            println!("INN update_value_by_position {:?}", self.value);
             cx.emit(SliderEvent::Change(self.value));
             cx.notify();
         }
@@ -291,6 +292,9 @@ impl RenderOnce for Slider {
                     let track_segments =
                         (0..no_of_segments).map(|idx| {
                             let segment_end_pos = (idx as f32 * unit_width) + BAR_SEGMENT_WIDTH;
+
+                            println!("INN --- checking active width {:?} ", active_width);
+
                             let is_active = segment_end_pos <= active_width;
 
                             div()

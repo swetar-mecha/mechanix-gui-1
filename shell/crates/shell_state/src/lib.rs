@@ -425,7 +425,7 @@ impl ShellStateManager {
                                 Some(VolumeMessage::VolumeChanged { name, value }) => {
                                     match pulse_manager.handle.set_sink_volume_by_name(&name, &value).await {
                                         Ok(_) => {
-                                            get_sound_device_info(&mut message_tx, &pulse_manager).await;
+                                            // get_sound_device_info(&mut message_tx, &pulse_manager).await;
                                         },
                                         Err(e) => {
                                             eprintln!("Failed to set volume: {}", e);
@@ -435,7 +435,7 @@ impl ShellStateManager {
                                 Some(VolumeMessage::MuteSink { name }) => {
                                     match pulse_manager.handle.set_sink_mute_by_name(&name).await {
                                         Ok(_) => {
-                                            get_sound_device_info(&mut message_tx, &pulse_manager).await;
+                                            // get_sound_device_info(&mut message_tx, &pulse_manager).await;
                                         }
                                         Err(e) => {
                                             eprintln!("Failed to set mute: {}", e);
@@ -445,7 +445,7 @@ impl ShellStateManager {
                                 Some(VolumeMessage::UnmuteSink { name }) => {
                                     match pulse_manager.handle.set_sink_unmute_by_name(&name).await {
                                         Ok(_) => {
-                                        get_sound_device_info(&mut message_tx, &pulse_manager).await; 
+                                        // get_sound_device_info(&mut message_tx, &pulse_manager).await; 
                                         }
                                         Err(e) => {
                                             eprintln!("Failed to unset mute: {}", e);
@@ -464,8 +464,7 @@ impl ShellStateManager {
                                 }
                                  Some(VolumeMessage::SetDefaultOutputSoundDevice { name }) => {
                                     match pulse_manager.handle.set_default_sink_by_name(&name).await {
-                                        Ok(_) => {
-                                            let _= get_sound_device_info(&mut message_tx, &pulse_manager).await;
+                                        Ok(_) => { 
                                         }
                                         Err(e) => {
                                             eprintln!("Failed to unset mute: {}", e);
