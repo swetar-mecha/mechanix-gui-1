@@ -5,7 +5,7 @@ use pulseaudio::service::PulseAudioService;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let service = PulseAudioService::new()?;
-    let available_sinks = service.handle.get_sinks().await?;
+    let available_sinks = service.handle.get_default_sink().await?;
     println!("{:#?}", available_sinks);
     service.handle.shutdown().await;
 
