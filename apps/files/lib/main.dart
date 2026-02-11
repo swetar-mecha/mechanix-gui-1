@@ -6,12 +6,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mechanix_files/app_config.dart';
 import 'package:mechanix_files/app_route.dart';
 import 'package:mechanix_files/load_settings.dart';
+import 'package:mechanix_files/src/commons/customWidgets/fps_overlay.dart';
 import 'package:mechanix_files/src/features/files/blocs/file_boc.dart';
 import 'package:mechanix_files/src/features/files/blocs/file_event.dart';
 import 'package:mechanix_files/src/features/files/data/file_repository.dart';
 import 'package:mechanix_files/src/features/files/data/file_repository_impl.dart';
 import 'package:mechanix_files/src/features/files/data/recent_file_manager_repository.dart';
-import 'package:mechanix_files/src/features/files/presentation/files.dart';
 import 'package:mechanix_files/src/features/files/presentation/files_home.dart';
 import 'package:watch_it/watch_it.dart';
 import 'package:widgets/mechanix.dart';
@@ -49,6 +49,15 @@ String _parseOpenPath() {
       : (runtimeOpenPath ?? '');
 }
 
+// Flag to control FPS display
+bool _parseShowFps() {
+  const compileTimeShowFps = bool.fromEnvironment('MECHANIX_FILES_SHOW_FPS', defaultValue: false);
+  final runtimeShowFpsStr = Platform.environment['MECHANIX_FILES_SHOW_FPS'];
+  final runtimeShowFps = runtimeShowFpsStr?.toLowerCase() == 'true';
+
+  return compileTimeShowFps || runtimeShowFps;
+}
+
 class MechanixFilesApp extends WatchingWidget {
   const MechanixFilesApp({super.key, required this.openPath});
   final String openPath;
@@ -82,7 +91,7 @@ class _MechanixFilesAppContentState extends State<_MechanixFilesAppContent> {
   late final DBusClient _bus;
   late final ThemeSettingsService _themeService;
 
-  MechanixThemeData _currentThemeData = MechanixThemeData(
+  MechanixThemeData _currentThemeData = const MechanixThemeData(
     mechanixVariant: MechanixVariant.amber,
   );
 
@@ -169,6 +178,19 @@ class MainApp extends StatelessWidget {
         ),
         routes: {
           AppRoutes.files: (context) => const FileHomePage(),
+        },
+        builder: (context, child) {
+          final kShowFPS = _parseShowFps();
+          // Wrap with custom FPS overlay
+          if (kShowFPS) {
+            return FPSOverlay(
+              alignment: Alignment.topRight,
+              visible: true,
+              child: child ?? const SizedBox.shrink(),
+            );
+          }
+
+          return child ?? const SizedBox.shrink();
         },
       ),
     );
