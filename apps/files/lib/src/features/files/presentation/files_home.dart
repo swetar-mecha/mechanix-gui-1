@@ -25,37 +25,39 @@ class FileHomePage extends StatefulWidget {
 }
 
 class FileHomePageState extends State<FileHomePage> {
-  final downloadsDir = AppConfig().downloadsDir;
-  final documentsDir = AppConfig().documentsDir;
-  final homeDir = AppConfig().homeDir;
-  final recentDir = AppConfig().recentDir;
+  late final String downloadsDir;
+  late final String documentsDir;
+  late final String homeDir;
+  late final String recentDir;
 
   @override
   void initState() {
     super.initState();
 
+    final config = AppConfig();
+    downloadsDir = config.downloadsDir;
+    documentsDir = config.documentsDir;
+    homeDir = config.homeDir;
+    recentDir = config.recentDir;
+
     if (widget.path.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => FileExplorerPage(
-              startPath: "/${widget.path.map((e) => e.name).join("/")}",
-              path: widget.path,
-            ),
-          ),
+        if (!mounted) return;
+        _navigateToPath(
+          "/${widget.path.map((e) => e.name).join("/")}",
+          widget.path,
         );
       });
     }
   }
 
   @override
-  void dispose() {
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final itemTitleStyle = _buildItemTitleStyle(context);
+    final sectionTitleStyle = _buildSectionTitleStyle(context);
+    final primaryColor = context.colorScheme.primary;
+    final containerColor = context.colorScheme.primaryContainer;
+
     return Scaffold(
       appBar: AppBar(
         scrolledUnderElevation: 0,
@@ -66,7 +68,7 @@ class FileHomePageState extends State<FileHomePage> {
           "Files",
           style: TextStyle(
             fontSize: 32,
-            color: context.colorScheme.primary,
+            color: primaryColor,
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -80,30 +82,32 @@ class FileHomePageState extends State<FileHomePage> {
                 sectionListItems: [
                   SectionListItems.leadingIcon(
                     title: "Home directory",
-                    titleTextStyle: listItemTitleTextStyle(context),
-                    onTap: () => onTap(context, homeDir, "Home"),
-                    iconColor: context.colorScheme.primaryContainer,
+                    titleTextStyle: itemTitleStyle,
+                    onTap: () => _navigateToDirectory(homeDir, "Home"),
+                    iconColor: containerColor,
                     iconPath: Images.home,
                   ),
                   SectionListItems.leadingIcon(
                     title: "Recents",
-                    titleTextStyle: listItemTitleTextStyle(context),
-                    onTap: () => onTap(context, recentDir, "Recents"),
-                    iconColor: context.colorScheme.primaryContainer,
+                    titleTextStyle: itemTitleStyle,
+                    onTap: () => _navigateToRecents(),
+                    iconColor: containerColor,
                     iconPath: Images.recent,
                   ),
                   SectionListItems.leadingIcon(
                     title: "Downloads",
-                    titleTextStyle: listItemTitleTextStyle(context),
-                    onTap: () => onTap(context, downloadsDir, "Downloads"),
-                    iconColor: context.colorScheme.primaryContainer,
+                    titleTextStyle: itemTitleStyle,
+                    onTap: () =>
+                        _navigateToDirectory(downloadsDir, "Downloads"),
+                    iconColor: containerColor,
                     iconPath: Images.downloads,
                   ),
                   SectionListItems.leadingIcon(
                     title: "Documents",
-                    titleTextStyle: listItemTitleTextStyle(context),
-                    onTap: () => onTap(context, documentsDir, "Documents"),
-                    iconColor: context.colorScheme.primaryContainer,
+                    titleTextStyle: itemTitleStyle,
+                    onTap: () =>
+                        _navigateToDirectory(documentsDir, "Documents"),
+                    iconColor: containerColor,
                     iconPath: Images.homeDocuments,
                   ),
                 ],
@@ -111,18 +115,14 @@ class FileHomePageState extends State<FileHomePage> {
               MechanixSectionList(
                 title: 'Hard Drive',
                 theme: MechanixSectionListThemeData(
-                  titleTextStyle: TextStyle(
-                    fontSize: 20,
-                    color: context.colorScheme.onSecondaryFixed,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  titleTextStyle: sectionTitleStyle,
                 ),
                 sectionListItems: [
                   SectionListItems.leadingIcon(
                     title: "Root (/)",
-                    titleTextStyle: listItemTitleTextStyle(context),
-                    onTap: () => onTap(context, "/", "Root"),
-                    iconColor: context.colorScheme.primaryContainer,
+                    titleTextStyle: itemTitleStyle,
+                    onTap: () => _navigateToDirectory("/", "Root"),
+                    iconColor: containerColor,
                     iconPath: Images.hardDrive,
                   ),
                 ],
@@ -134,7 +134,7 @@ class FileHomePageState extends State<FileHomePage> {
     );
   }
 
-  TextStyle listItemTitleTextStyle(BuildContext context) {
+  TextStyle _buildItemTitleStyle(BuildContext context) {
     return TextStyle(
       fontSize: 20,
       color: context.colorScheme.onSurface,
@@ -142,39 +142,121 @@ class FileHomePageState extends State<FileHomePage> {
     );
   }
 
-  void onTap(BuildContext context, String path, String title) {
-    if (path == recentDir) {
-      final filesBloc = BlocProvider.of<FilesBloc>(context);
-      filesBloc.add(LoadRecentFiles());
+  TextStyle _buildSectionTitleStyle(BuildContext context) {
+    return TextStyle(
+      fontSize: 20,
+      color: context.colorScheme.onSecondaryFixed,
+      fontWeight: FontWeight.w500,
+    );
+  }
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => BlocProvider.value(
-            value: filesBloc,
-            child: FileExplorerPage(
-              title: 'Recent',
-              path: pathToSegments(path),
-            ),
-          ),
+  void _navigateToRecents() async {
+    if (!mounted) return;
+    final filesBloc = context.read<FilesBloc>();
+
+    // Pre-build the route before navigation
+    await _navigateWithPrebuiltSlide(
+      bloc: filesBloc,
+      page: FileExplorerPage(
+        title: 'Recent',
+        path: pathToSegments(recentDir),
+      ),
+      onNavigated: () {
+        if (mounted) filesBloc.add(LoadRecentFiles());
+      },
+    );
+  }
+
+  void _navigateToDirectory(String path, String title) async {
+    if (!mounted) return;
+    final filesBloc = context.read<FilesBloc>();
+
+    await _navigateWithPrebuiltSlide(
+      bloc: filesBloc,
+      page: FileExplorerPage(startPath: path),
+    );
+  }
+
+  void _navigateToPath(String startPath, List<FileItem> path) async {
+    if (!mounted) return;
+    final filesBloc = context.read<FilesBloc>();
+
+    await _navigateWithPrebuiltSlide(
+      bloc: filesBloc,
+      page: FileExplorerPage(
+        startPath: startPath,
+        path: path,
+      ),
+    );
+  }
+
+  // CRITICAL FIX: Pre-build and warm up the route before navigating
+  // Future<void> _navigateWithPrebuiltSlide({
+  //   required FilesBloc bloc,
+  //   required Widget page,
+  //   VoidCallback? onNavigated,
+  // }) async {
+  //   // Give the UI thread a frame to prepare
+  //   await Future.delayed(const Duration(milliseconds: 50));
+
+  //   if (!mounted) return;
+
+  //   final route = PageRouteBuilder<void>(
+  //     pageBuilder: (context, animation, secondaryAnimation) {
+  //       // Wrap in RepaintBoundary to isolate rendering
+  //       return RepaintBoundary(
+  //         child: BlocProvider.value(
+  //           value: bloc,
+  //           child: page,
+  //         ),
+  //       );
+  //     },
+  //     transitionsBuilder: (context, animation, secondaryAnimation, child) {
+  //       const begin = Offset(1.0, 0.0);
+  //       const end = Offset.zero;
+  //       const curve = Curves.easeOutCubic;
+
+  //       final tween =
+  //           Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+
+  //       // Wrap SlideTransition in RepaintBoundary
+  //       return RepaintBoundary(
+  //         child: SlideTransition(
+  //           position: animation.drive(tween),
+  //           child: child,
+  //         ),
+  //       );
+  //     },
+  //     transitionDuration: const Duration(milliseconds: 250),
+  //   );
+
+  //   // Navigate with the pre-built route
+  //   await Navigator.push(context, route);
+  //   onNavigated?.call();
+  // }
+
+  Future<void> _navigateWithPrebuiltSlide({
+    required FilesBloc bloc,
+    required Widget page,
+    VoidCallback? onNavigated,
+  }) async {
+    if (!mounted) return;
+
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => BlocProvider.value(
+          value: bloc,
+          child: page,
         ),
-      );
-    } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => FileExplorerPage(
-            startPath: path,
-          ),
-          //   ),
-        ),
-      );
-    }
+      ),
+    );
+
+    onNavigated?.call();
   }
 }
 
 List<FileItem> pathToSegments(String fullPath) {
-  // Remove leading/trailing slashes, then split
   final segments =
       fullPath.split('/').where((segment) => segment.isNotEmpty).toList();
 

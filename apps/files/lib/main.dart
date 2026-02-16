@@ -57,6 +57,15 @@ String _parseOpenPath() {
       : (runtimeOpenPath ?? '');
 }
 
+bool _parseShowFps() {
+  const compileTimeShowFps =
+      bool.fromEnvironment('MECHANIX_FILES_SHOW_FPS', defaultValue: false);
+  final runtimeShowFpsStr = Platform.environment['MECHANIX_FILES_SHOW_FPS'];
+  final runtimeShowFps = runtimeShowFpsStr?.toLowerCase() == 'true';
+
+  return compileTimeShowFps || runtimeShowFps;
+}
+
 /// ---------------------------------------------------------------------------
 /// ROOT APP (LISTENS ONLY TO THEME MODE)
 /// ---------------------------------------------------------------------------
@@ -196,6 +205,19 @@ class _MainAppState extends State<_MainApp> {
         ),
         routes: {
           AppRoutes.files: (_) => const FileHomePage(),
+        },
+        builder: (context, child) {
+          final kShowFPS = _parseShowFps();
+          // Wrap with custom FPS overlay
+          if (kShowFPS) {
+            return FPSOverlay(
+              alignment: Alignment.topRight,
+              visible: true,
+              child: child ?? const SizedBox.shrink(),
+            );
+          }
+
+          return child ?? const SizedBox.shrink();
         },
       ),
     );
