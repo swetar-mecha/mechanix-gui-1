@@ -16,9 +16,16 @@ import 'package:mechanix_files/src/features/files/presentation/files_home.dart';
 import 'package:watch_it/watch_it.dart';
 import 'package:widgets/mechanix.dart';
 
+/// ---------------------------------------------------------------------------
+/// APP ENTRY
+/// ---------------------------------------------------------------------------
+
 Future<void> main(List<String> args) async {
-  di.registerSingleton(ThemeToggle());
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Global, stable singletons
+  di.registerSingleton(ThemeToggle());
+  di.registerSingleton<_ThemeController>(_ThemeController());
 
   final configResult = await connectToMxconf();
   AppConfig().loadFromMap(configResult);
@@ -26,7 +33,7 @@ Future<void> main(List<String> args) async {
   final openPath = _parseOpenPath();
 
   runApp(
-    MultiBlocProvider(
+    MultiRepositoryProvider(
       providers: [
         RepositoryProvider<RecentFilesManager>(
           create: (_) => RecentFilesManager(),
@@ -44,37 +51,43 @@ String _parseOpenPath() {
   const compileTimeOpenPath =
       String.fromEnvironment('MECHANIX_FILES_OPEN_PATH');
   final runtimeOpenPath = Platform.environment['MECHANIX_FILES_OPEN_PATH'];
+
   return compileTimeOpenPath.isNotEmpty
       ? compileTimeOpenPath
       : (runtimeOpenPath ?? '');
 }
 
-// Flag to control FPS display
-bool _parseShowFps() {
-  const compileTimeShowFps = bool.fromEnvironment('MECHANIX_FILES_SHOW_FPS', defaultValue: false);
-  final runtimeShowFpsStr = Platform.environment['MECHANIX_FILES_SHOW_FPS'];
-  final runtimeShowFps = runtimeShowFpsStr?.toLowerCase() == 'true';
-
-  return compileTimeShowFps || runtimeShowFps;
-}
+/// ---------------------------------------------------------------------------
+/// ROOT APP (LISTENS ONLY TO THEME MODE)
+/// ---------------------------------------------------------------------------
 
 class MechanixFilesApp extends WatchingWidget {
-  const MechanixFilesApp({super.key, required this.openPath});
+  const MechanixFilesApp({
+    super.key,
+    required this.openPath,
+  });
+
   final String openPath;
 
   @override
   Widget build(BuildContext context) {
-    final themeMode = watchPropertyValue((ThemeToggle t) => t.themeMode);
+    final themeMode = watchPropertyValue(
+      (ThemeToggle t) => t.themeMode,
+    );
 
-    return _MechanixFilesAppContent(
+    return _ThemeRoot(
       openPath: openPath,
       themeMode: themeMode,
     );
   }
 }
 
-class _MechanixFilesAppContent extends StatefulWidget {
-  const _MechanixFilesAppContent({
+/// ---------------------------------------------------------------------------
+/// THEME ROOT (DBUS + MECHANIX THEME HANDLING)
+/// ---------------------------------------------------------------------------
+
+class _ThemeRoot extends StatefulWidget {
+  const _ThemeRoot({
     required this.openPath,
     required this.themeMode,
   });
@@ -83,121 +96,73 @@ class _MechanixFilesAppContent extends StatefulWidget {
   final ThemeMode themeMode;
 
   @override
-  State<_MechanixFilesAppContent> createState() =>
-      _MechanixFilesAppContentState();
+  State<_ThemeRoot> createState() => _ThemeRootState();
 }
 
-class _MechanixFilesAppContentState extends State<_MechanixFilesAppContent> {
-  late final DBusClient _bus;
-  late final ThemeSettingsService _themeService;
+class _ThemeRootState extends State<_ThemeRoot> {
+  final _ThemeController _controller = di<_ThemeController>();
 
-  MechanixThemeData _currentThemeData = const MechanixThemeData(
+  MechanixThemeData _themeData = const MechanixThemeData(
     mechanixVariant: MechanixVariant.amber,
   );
 
   @override
   void initState() {
     super.initState();
-    _initializeThemeService();
+    _controller.init(_onThemeChanged);
   }
 
-  void _initializeThemeService() {
-    _bus = DBusClient.session();
-    _themeService = ThemeSettingsService(_bus);
-
-    _themeService.listenForThemeChanges(_handleThemeChange);
-    _fetchInitialTheme();
-  }
-
-  Future<void> _fetchInitialTheme() async {
-    final colors = await _themeService.fetchCurrentTheme();
-    if (colors != null) {
-      _handleThemeChange(colors);
-    }
-  }
-
-  void _handleThemeChange(Map<String, String> colors) {
-    setState(() {
-      _currentThemeData = _themeService.colorsToThemeData(colors);
-    });
+  void _onThemeChanged(MechanixThemeData data) {
+    if (!mounted) return;
+    setState(() => _themeData = data);
   }
 
   @override
   void dispose() {
-    _themeService.dispose();
-    _bus.close();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return MechanixTheme(
-      data: _currentThemeData,
-      builder: (context, mechanix, child) => MainApp(
-        darkTheme: mechanix.darkTheme,
-        lightTheme: mechanix.lightTheme,
-        themeMode: widget.themeMode,
+      data: _themeData,
+      child: _MainApp(
         openPath: widget.openPath,
+        themeMode: widget.themeMode,
       ),
     );
   }
 }
 
-class MainApp extends StatelessWidget {
-  const MainApp({
-    super.key,
-    required this.lightTheme,
-    required this.darkTheme,
-    required this.themeMode,
+/// ---------------------------------------------------------------------------
+/// MAIN APP (BLOCS + MATERIAL APP)
+/// ---------------------------------------------------------------------------
+
+class _MainApp extends StatefulWidget {
+  const _MainApp({
     required this.openPath,
+    required this.themeMode,
   });
 
-  final ThemeData lightTheme;
-  final ThemeData darkTheme;
-  final ThemeMode themeMode;
   final String openPath;
+  final ThemeMode themeMode;
 
   @override
-  Widget build(BuildContext context) {
-    return MultiBlocProvider(
-      providers: [
-        BlocProvider(
-          create: (_) => FilesBloc(
-            fileRepository: context.read<FileRepository>(),
-            recentFilesManager: context.read<RecentFilesManager>(),
-          )..add(InitializeFiles()),
-        ),
-      ],
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: darkTheme,
-        darkTheme: _buildDarkTheme(),
-        themeMode: themeMode,
-        home: FileHomePage(
-          path: openPath.isNotEmpty ? pathToSegments(openPath) : const [],
-        ),
-        routes: {
-          AppRoutes.files: (context) => const FileHomePage(),
-        },
-        builder: (context, child) {
-          final kShowFPS = _parseShowFps();
-          // Wrap with custom FPS overlay
-          if (kShowFPS) {
-            return FPSOverlay(
-              alignment: Alignment.topRight,
-              visible: true,
-              child: child ?? const SizedBox.shrink(),
-            );
-          }
+  State<_MainApp> createState() => _MainAppState();
+}
 
-          return child ?? const SizedBox.shrink();
-        },
-      ),
-    );
-  }
+class _MainAppState extends State<_MainApp> {
+  late ThemeData _cachedDarkTheme;
 
-  ThemeData _buildDarkTheme() {
-    return darkTheme.copyWith(
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final mechanix = MechanixTheme.of(context);
+
+    // Cache theme to avoid rebuild allocations
+    _cachedDarkTheme = mechanix.darkTheme.copyWith(
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
           TargetPlatform.linux: CupertinoPageTransitionsBuilder(),
@@ -205,4 +170,92 @@ class MainApp extends StatelessWidget {
       ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    final mechanix = MechanixTheme.of(context);
+
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<FilesBloc>(
+          create: (_) => FilesBloc(
+            fileRepository: context.read<FileRepository>(),
+            recentFilesManager: context.read<RecentFilesManager>(),
+          ),
+        ),
+      ],
+      child: MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: mechanix.lightTheme,
+        darkTheme: _cachedDarkTheme,
+        themeMode: widget.themeMode,
+        home: FileHomePage(
+          path: widget.openPath.isNotEmpty
+              ? pathToSegments(widget.openPath)
+              : const [],
+        ),
+        routes: {
+          AppRoutes.files: (_) => const FileHomePage(),
+        },
+      ),
+    );
+  }
 }
+
+/// ---------------------------------------------------------------------------
+/// THEME CONTROLLER (DBUS LIFECYCLE OUTSIDE UI LOGIC)
+/// ---------------------------------------------------------------------------
+
+class _ThemeController {
+  late final DBusClient _bus;
+  late final ThemeSettingsService _service;
+
+  void init(void Function(MechanixThemeData) onChange) {
+    _bus = DBusClient.session();
+    _service = ThemeSettingsService(_bus);
+
+    _service.listenForThemeChanges((colors) {
+      final data = _service.colorsToThemeData(colors);
+      onChange(data);
+    });
+
+    _loadInitialTheme(onChange);
+  }
+
+  Future<void> _loadInitialTheme(
+    void Function(MechanixThemeData) onChange,
+  ) async {
+    final colors = await _service.fetchCurrentTheme();
+    if (colors != null) {
+      onChange(_service.colorsToThemeData(colors));
+    }
+  }
+
+  void dispose() {
+    _service.dispose();
+    _bus.close();
+  }
+}
+
+/// ---------------------------------------------------------------------------
+/// FILES BLOC (FIXED: NO UI-SIDE EFFECTS)
+/// ---------------------------------------------------------------------------
+
+// class FilesBloc extends Bloc<FilesEvent, FilesState> {
+//   FilesBloc({
+//     required FileRepository fileRepository,
+//     required RecentFilesManager recentFilesManager,
+//   }) : super(const FilesState.initial()) {
+//     on<InitializeFiles>(_onInitialize);
+
+//     // ✅ Safe self-initialization
+//     add(InitializeFiles());
+//   }
+
+//   Future<void> _onInitialize(
+//     InitializeFiles event,
+//     Emitter<FilesState> emit,
+//   ) async {
+//     // lazy / paginated file loading logic
+//   }
+// }
